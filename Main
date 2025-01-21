@@ -1,0 +1,126 @@
+import os
+import time
+import webbrowser
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
+import pandas as pd
+
+def slow_print(text, delay=0.1):
+    for char in text:
+        print(char, end='', flush=True)
+        time.sleep(delay)
+    print()
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def greeting():
+    greeting_text = "Приветствую тебя в своём софте!"
+    print(greeting_text)
+    time.sleep(2)
+    clear_screen()
+
+phone_directory = {
+    "996551949": "Номер: 79888675440 ФИО: Дима, Бекстриб",
+}
+
+def display_ascii_art():
+    ascii_art = r'''
+██ ███   ██ ██    ██ ███████  ██████ ████████ ██  ██████   █████  ████████  █████  ██████
+██ ████  ██ ██    ██ ██      ██         ██    ██ ██       ██   ██    ██    ██   ██ ██   ██
+██ ██ ██ ██  ██  ██  █████    █████     ██    ██ ██   ██  ███████    ██    ██   ██ ██████
+██ ██  ████   ████   ██           ██    ██    ██ ██    ██ ██   ██    ██    ██   ██ ██   ██
+██ ██   ███    ██    ███████ ██████     ██    ██  ██████  ██   ██    ██     █████  ██   ██
+    '''
+    print(ascii_art)
+
+def read_file_any_format(filepath):
+    try:
+        if filepath.endswith('.csv'):
+            return pd.read_csv(filepath)
+        elif filepath.endswith('.xlsx') or filepath.endswith('.xls'):
+            return pd.read_excel(filepath)
+        elif filepath.endswith('.json'):
+            return pd.read_json(filepath)
+        else:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return f.readlines()
+    except Exception as e:
+        print(f"[-] Не удалось прочитать файл {os.path.basename(filepath)}: {e}")
+        return None
+
+def search_in_data(data, search_value):
+    if isinstance(data, pd.DataFrame):
+        for column in data.columns:
+            if data[column].astype(str).str.contains(search_value).any():
+                return True
+    elif isinstance(data, list):
+        for line in data:
+            if search_value in line:
+                return True
+    return False
+
+def search_file(database_path, search_value):
+    data = read_file_any_format(database_path)
+    if data is not None and search_in_data(data, search_value):
+        print(f"[+] Найдено в файле {os.path.basename(database_path)}")
+        return True
+    return False
+
+def search_in_database(database_folder, search_value):
+    try:
+        files = [os.path.join(database_folder, f) for f in os.listdir(database_folder) if os.path.isfile(os.path.join(database_folder, f))]
+        num_threads = min(32, cpu_count() + 4)
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            results = executor.map(lambda file: search_file(file, search_value), files)
+        if not any(results):
+            print("[-] Не найдено в базах данных.")
+    except FileNotFoundError:
+        print("[-] Папка или файл не найдены. Проверьте путь.")
+    except Exception as e:
+        print(f"[-] Произошла ошибка: {e}")
+
+def search_in_leaks():
+    webbrowser.open("https://cybersec.org/search/index.php")
+
+def run_program():
+    display_ascii_art()
+
+    while True:
+        print("Выберите опцию:")
+        print("1. Поиск по утечкам сервисов")
+        print("2. Поиск по базам данных")
+        print("0. Выход")
+        choice = input("Ваш выбор ==> ")
+
+        if choice == "1":
+            search_in_leaks()
+
+        elif choice == "2":
+            print("Выберите тип поиска:")
+            print("1. По номеру телефона")
+            print("2. По email")
+            print("3. По СНИЛС")
+            print("4. По номеру карты")
+            print("5. По номеру паспорта")
+            print("6. По ФИО")
+            search_type = input("Ваш выбор ==> ")
+
+            database_folder = input("Введите путь к папке с базами данных: ")
+            search_value = input("Введите значение для поиска: ")
+
+            if search_type in ['1', '2', '3', '4', '5', '6']:
+                search_in_database(database_folder, search_value)
+            else:
+                print("[-] Неправильный выбор типа поиска.")
+
+        elif choice == "0":
+            print("Выход...")
+            break
+
+        else:
+            print("Неправильный выбор! Пожалуйста, попробуйте снова.")
+
+if __name__ == "__main__":
+    greeting()
+    run_program()
