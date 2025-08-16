@@ -1,18 +1,14 @@
--- SuperSmartPathfinder with Parkour Toggle Mode
-local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Debris = game:GetService("Debris")
 
 local localPlayer = Players.LocalPlayer
-
+local connections = {}
 local moving = false
 local smartTapEnabled = false
-local parkourMode = false -- 🎯 Toggle Parkour Mode
-
-local moveConnection = nil
-local followConnection = nil
+local parkourMode = false
 local currentTarget = nil
 
 --------------------------------------------------------
@@ -27,7 +23,6 @@ local function getCharacter(player)
     return nil, nil, nil
 end
 
--- Визуализация пути
 local function drawPath(waypoints)
     for i = 1, #waypoints - 1 do
         local p1, p2 = waypoints[i].Position, waypoints[i + 1].Position
@@ -43,7 +38,6 @@ local function drawPath(waypoints)
     end
 end
 
--- Построение пути
 local function computePath(startPos, destination)
     local path = PathfindingService:CreatePath({
         AgentRadius = 2,
@@ -61,43 +55,35 @@ local function computePath(startPos, destination)
         drawPath(waypoints)
         return waypoints
     else
-        warn("[PATHFINDING] Не удалось построить путь: " .. tostring(path.Status))
+        warn("[PATHFINDING] Путь не построен: " .. tostring(path.Status))
+        return nil
     end
-    return nil
 end
 
---------------------------------------------------------
--- Паркур
---------------------------------------------------------
 local function performParkourMove(humanoid, hrp, obstacle)
     if obstacle and obstacle:IsA("BasePart") then
         local posDiff = obstacle.Position.Y - hrp.Position.Y
 
-        -- Edge Grab climb
         if posDiff > 2 and posDiff < 6 then
             humanoid.Jump = true
             task.wait(0.2)
             hrp.CFrame = hrp.CFrame + Vector3.new(0, posDiff + 2, 0)
-        elseif posDiff >= 6 and posDiff <= 8 then
-            -- WallJump
+        elseif posDiff >=6 and posDiff <=8 then
             humanoid.Jump = true
             task.wait(0.15)
             humanoid:Move(Vector3.new(0, 0, -1))
             task.wait(0.1)
             humanoid.Jump = true
-        elseif posDiff > 8 and posDiff < 12 then
-            -- Diagonal jump trick
+        elseif posDiff >8 and posDiff < 12 then
             humanoid.Jump = true
             task.wait(0.1)
             hrp.CFrame = hrp.CFrame + Vector3.new(1.5, 3, 1.5)
         elseif posDiff >= 0 and posDiff <= 2 then
-            -- Corner Cut
             humanoid:Move(Vector3.new(1, 0, 1))
         end
     end
 end
 
--- Следование по пути с паркуром
 local function followPathWithParkour(humanoid, hrp, waypoints)
     moving = true
     for _, waypoint in ipairs(waypoints) do
@@ -122,12 +108,11 @@ local function followPathWithParkour(humanoid, hrp, waypoints)
             humanoid.Jump = true
         end
 
-        task.wait() -- чтобы не заблокировать цикл
+        task.wait()
     end
     moving = false
 end
 
--- Обычное следование по пути
 local function followPathNormal(humanoid, hrp, waypoints)
     moving = true
     for _, waypoint in ipairs(waypoints) do
@@ -142,7 +127,6 @@ local function followPathNormal(humanoid, hrp, waypoints)
     moving = false
 end
 
--- Выбор режима движения
 local function followPath(humanoid, hrp, waypoints)
     if parkourMode then
         followPathWithParkour(humanoid, hrp, waypoints)
@@ -152,59 +136,68 @@ local function followPath(humanoid, hrp, waypoints)
 end
 
 --------------------------------------------------------
--- Команды
+-- Основные команды
 --------------------------------------------------------
--- SMARTTAP
-local function toggleSmartTap()
-    smartTapEnabled = not smartTapEnabled
-    if smartTapEnabled then
-        print("[🧠 SMARTTAP] Включен, кликайте по карте!")
-        moveConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local mouse = localPlayer:GetMouse()
-                local char, hrp, humanoid = getCharacter(localPlayer)
-                if char and hrp and humanoid then
-                    local path = computePath(hrp.Position, mouse.Hit.p)
-                    if path then
-                        followPath(humanoid, hrp, path)
-                    else
-                        warn("[SMARTTAP] Не удалось построить путь.")
-                    end
-                end
-            end
-        end)
-    else
-        print("[🛑 SMARTTAP] Выключен.")
-        if moveConnection then
-            moveConnection:Disconnect()
-            moveConnection = nil
+local function clearConnections()
+    for i, conn in ipairs(connections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
         end
     end
+    table.clear(connections)
 end
 
--- SMARTFOLLOW
-local function smartFollow(targetFilter)
-    if followConnection then
-        followConnection:Disconnect()
-        followConnection = nil
+local function toggleSmartTap()
+    if smartTapEnabled then
+        clearConnections()
+        smartTapEnabled = false
+        print("[🛑 SMARTTAP] Выключен.")
+        return
     end
+
+    smartTapEnabled = true
+    print("[🧠 SMARTTAP] Включен, кликайте по карте!")
+
+    local conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mouse = localPlayer:GetMouse()
+            local char, hrp, humanoid = getCharacter(localPlayer)
+            if char and hrp and humanoid then
+                local path = computePath(hrp.Position, mouse.Hit.p)
+                if path then
+                    followPath(humanoid, hrp, path)
+                else
+                    warn("[SMARTTAP] Путь не найден.")
+                end
+            end
+        end
+    end)
+    table.insert(connections, conn)
+end
+
+local function smartFollow(targetFilter)
+    clearConnections()
+    currentTarget = nil
 
     local targetPlayers
     if _G.getPlayer then
         targetPlayers = _G.getPlayer(targetFilter)
     else
-        -- fallback - поиск игрока по имени среди всех
         targetPlayers = {}
         if targetFilter == "nearest" then
             local shortestDist = math.huge
             local nearest = nil
             for _, player in pairs(Players:GetPlayers()) do
-                if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < shortestDist then
-                        nearest = player
-                        shortestDist = dist
+                if player ~= localPlayer then
+                    local char, hrp = getCharacter(player)
+                    local myChar, myHrp = getCharacter(localPlayer)
+                    if hrp and myHrp then
+                        local dist = (hrp.Position - myHrp.Position).Magnitude
+                        if dist < shortestDist then
+                            nearest = player
+                            shortestDist = dist
+                        end
                     end
                 end
             end
@@ -224,10 +217,11 @@ local function smartFollow(targetFilter)
         warn("[⚠ SMARTFOLLOW] Игрок не найден.")
         return
     end
+
     currentTarget = targetPlayers[1]
     print("[🧠 SMARTFOLLOW] Следую за: " .. currentTarget.Name .. (parkourMode and " (Паркур)" or ""))
 
-    followConnection = RunService.Heartbeat:Connect(function()
+    local conn = RunService.Heartbeat:Connect(function()
         if not moving and currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
             local char, hrp, humanoid = getCharacter(localPlayer)
             local targetChar, targetHRP = currentTarget.Character, currentTarget.Character:FindFirstChild("HumanoidRootPart")
@@ -240,57 +234,53 @@ local function smartFollow(targetFilter)
             end
         end
     end)
+    table.insert(connections, conn)
 end
 
--- SMARTPATH
 local function smartPathXYZ(args)
+    local char, hrp, humanoid = getCharacter(localPlayer)
+    if not (char and hrp and humanoid) then
+        warn("[SMARTPATH] Ваш персонаж отсутствует.")
+        return
+    end
+
     if #args < 3 then
         warn("Использование: smartpath X Y Z")
         return
     end
-    local char, hrp, humanoid = getCharacter(localPlayer)
-    if char and hrp and humanoid then
-        local x, y, z = tonumber(args[1]), tonumber(args), tonumber(args)
-        if x and y and z then
-            local goal = Vector3.new(x, y, z)
-            local path = computePath(hrp.Position, goal)
-            if path then
-                followPath(humanoid, hrp, path)
-            else
-                warn("[SMARTPATH] Не удалось построить путь.")
-            end
-        else
-            warn("[SMARTPATH] Неверные координаты.")
-        end
+
+    local x, y, z = tonumber(args[1]), tonumber(args), tonumber(args)
+    if not (x and y and z) then
+        warn("[SMARTPATH] Неверные координаты.")
+        return
+    end
+
+    local goal = Vector3.new(x, y, z)
+    local path = computePath(hrp.Position, goal)
+    if path then
+        followPath(humanoid, hrp, path)
+    else
+        warn("[SMARTPATH] Путь не найден.")
     end
 end
 
--- TOGGLE PARKOUR MODE
 local function toggleParkour()
     parkourMode = not parkourMode
     print(parkourMode and "[🤸‍♂️ PARKOUR MODE] Включен" or "[🚶‍♂️ PARKOUR MODE] Выключен")
 end
 
--- STOPMOVE
 local function stopMoving()
     moving = false
-    if followConnection then
-        followConnection:Disconnect()
-        followConnection = nil
-    end
-    if moveConnection then
-        moveConnection:Disconnect()
-        moveConnection = nil
-    end
+    clearConnections()
     local char, hrp, humanoid = getCharacter(localPlayer)
     if humanoid then
-        humanoid:Move(Vector3.new(0, 0, 0))
+        humanoid:Move(Vector3.new(0,0,0))
     end
     print("[🛑 STOPMOVE] Движение остановлено.")
 end
 
 --------------------------------------------------------
--- Плагин Infinite Yield
+-- Плагин
 --------------------------------------------------------
 local Plugin = {
     PluginName = "SuperSmartPathfinder",
@@ -299,6 +289,7 @@ local Plugin = {
         smarttap = {
             ListName = "smarttap",
             Description = "Включает/выключает умное Tap-to-Move",
+            Aliases = {},
             Function = function(args, speaker)
                 toggleSmartTap()
             end
@@ -306,6 +297,7 @@ local Plugin = {
         smartfollow = {
             ListName = "smartfollow",
             Description = "Следует за указанным игроком",
+            Aliases = {},
             Function = function(args, speaker)
                 smartFollow(args[1] or "nearest")
             end
@@ -313,6 +305,7 @@ local Plugin = {
         smartpath = {
             ListName = "smartpath",
             Description = "Построение пути к заданным координатам",
+            Aliases = {},
             Function = function(args, speaker)
                 smartPathXYZ(args)
             end
@@ -320,6 +313,7 @@ local Plugin = {
         parkourmode = {
             ListName = "parkourmode",
             Description = "Переключает режим паркура",
+            Aliases = {},
             Function = function(args, speaker)
                 toggleParkour()
             end
@@ -327,6 +321,7 @@ local Plugin = {
         stopmove = {
             ListName = "stopmove",
             Description = "Останавливает любое движение",
+            Aliases = {},
             Function = function(args, speaker)
                 stopMoving()
             end
