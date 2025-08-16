@@ -1,303 +1,356 @@
-напиши скрипт еще раз, кстати на заметочку, в плагине pathfind должен прокладывать дорогу на порядок лучше чем метод "tap to move" раз так в 1000
-
 local Plugin = {
-    ["PluginName"] = "SmartPathfinderPlus",
-    ["PluginDescription"] = "Improved smart pathfinder with ultra-efficient pathfinding, smart tap, follow and coordinate pathing with stop.",
-    ["Commands"] = {
-        ["smarttap"] = {
-            ["ListName"] = "smarttap",
-            ["Description"] = "Toggle ultra-smart tap to move using advanced pathfinding.",
-            ["Aliases"] = {"stap"},
-            ["Function"] = function(args, speaker)
-                local player = game.Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                local root = character:WaitForChild("HumanoidRootPart")
-                local pathfindingService = game:GetService("PathfindingService")
-                local mouse = player:GetMouse()
-
-                if not _G.SmartTapEnabled then
-                    _G.SmartTapEnabled = true
-                    print("SmartTap enabled - click to move with intelligent pathfinding")
-
-                    _G.SmartTapConnection = mouse.Button1Down:Connect(function()
-                        if not _G.SmartTapEnabled then return end
-
-                        local targetPosition = mouse.Hit.p
-
-                        -- Compute and follow path repeatedly for dynamic obstacle handling
-                        coroutine.wrap(function()
-                            while _G.SmartTapEnabled do
-                                local path = pathfindingService:CreatePath({
-                                    AgentRadius = 2,
-                                    AgentHeight = 5,
-                                    AgentCanJump = false,  -- no infinite jump
-                                    AgentCanClimb = true   -- allow ladder climbing
-                                })
-
-                                path:ComputeAsync(root.Position, targetPosition)
-
-                                if path.Status == Enum.PathStatus.Success then
-                                    -- Visualize path points
-                                    for _, waypoint in pairs(path:GetWaypoints()) do
-                                        local part = Instance.new("Part")
-                                        part.Anchored = true
-                                        part.CanCollide = false
-                                        part.Size = Vector3.new(0.3,0.3,0.3)
-                                        part.Shape = Enum.PartType.Ball
-                                        part.Material = Enum.Material.Neon
-                                        part.BrickColor = BrickColor.new("Bright green")
-                                        part.Transparency = 0.5
-                                        part.Position = waypoint.Position + Vector3.new(0,1,0)
-                                        part.Parent = workspace
-                                        game.Debris:AddItem(part, 2)
-                                    end
-
-                                    -- Walk through waypoints intelligently
-                                    for _, waypoint in pairs(path:GetWaypoints()) do
-                                        if not _G.SmartTapEnabled then break end
-
-                                        if waypoint.Action == Enum.PathWaypointAction.Jump then
-                                            humanoid.Jump = true
-                                        elseif waypoint.Action == Enum.PathWaypointAction.Climb then
-                                            humanoid:MoveTo(waypoint.Position)
-                                            repeat wait() until (root.Position - waypoint.Position).magnitude < 2 or not _G.SmartTapEnabled
-                                        else
-                                            humanoid:MoveTo(waypoint.Position)
-                                            repeat wait() until (root.Position - waypoint.Position).magnitude < 2 or not _G.SmartTapEnabled
-                                        end
-                                    end
-
-                                    break -- path followed successfully, exit loop
-                                else
-                                    -- If path blocked, retry every 0.5 seconds
-                                    wait(0.5)
-                                end
-                            end
-                        end)()
-                    end)
-                else
-                    _G.SmartTapEnabled = false
-                    if _G.SmartTapConnection then
-                        _G.SmartTapConnection:Disconnect()
-                        _G.SmartTapConnection = nil
-                    end
-                    humanoid:MoveTo(root.Position)
-                    print("SmartTap disabled.")
-                end
-            end
-        },
-
-        ["smartfollow"] = {
-            ["ListName"] = "smartfollow",
-            ["Description"] = "Follow a player intelligently using pathfinding.",
-            ["Function"] = function(args, speaker)
-                local Players = game:GetService("Players")
-                local pathfindingService = game:GetService("PathfindingService")
-                local player = Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                local root = character:WaitForChild("HumanoidRootPart")
-
-                if not args[11] then
-                    print("Usage: smartfollow [player]")
-                    return
-                end
-
-                -- Find target players according to filters (simplified)
-                local function findPlayers(filter)
-                    local list = {}
-                    if filter == "me" then
-                        table.insert(list, player)
-                    elseif filter == "all" then
-                        for _,p in pairs(Players:GetPlayers()) do table.insert(list,p) end
-                    elseif filter == "others" then
-                        for _,p in pairs(Players:GetPlayers()) do if p ~= player then table.insert(list, p) end end
-                    elseif string.sub(filter,1,1) == "@" then
-                        local name = string.sub(filter, 2)
-                        for _,p in pairs(Players:GetPlayers()) do
-                            if p.Name:lower() == name:lower() then
-                                table.insert(list, p)
-                                break
-                            end
-                        end
-                    else
-                        for _,p in pairs(Players:GetPlayers()) do
-                            if p.Name:lower() == filter:lower() then
-                                table.insert(list,p)
-                                break
-                            end
-                        end
-                    end
-                    return list
-                end
-
-                local targets = findPlayers(args[11])
-                if #targets == 0 then
-                    print("No players found with filter: "..args[11])
-                    return
-                end
-
-                _G.SmartFollowEnabled = true
-                local target = targets[11]
-
-                coroutine.wrap(function()
-                    while _G.SmartFollowEnabled do
-                        if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                            local targetPos = target.Character.HumanoidRootPart.Position
-                            local path = pathfindingService:CreatePath({
-                                AgentRadius = 2,
-                                AgentHeight = 5,
-                                AgentCanJump = false,
-                                AgentCanClimb = true
-                            })
-                            path:ComputeAsync(root.Position, targetPos)
-
-                            if path.Status == Enum.PathStatus.Success then
-                                -- Visualize path
-                                for _, waypoint in pairs(path:GetWaypoints()) do
-                                    local part = Instance.new("Part")
-                                    part.Anchored = true
-                                    part.CanCollide = false
-                                    part.Size = Vector3.new(0.3,0.3,0.3)
-                                    part.Shape = Enum.PartType.Ball
-                                    part.Material = Enum.Material.Neon
-                                    part.BrickColor = BrickColor.new("Bright blue")
-                                    part.Transparency = 0.5
-                                    part.Position = waypoint.Position + Vector3.new(0,1,0)
-                                    part.Parent = workspace
-                                    game.Debris:AddItem(part, 1)
-                                end
-
-                                for _, waypoint in pairs(path:GetWaypoints()) do
-                                    if not _G.SmartFollowEnabled then break end
-                                    if waypoint.Action == Enum.PathWaypointAction.Jump then
-                                        humanoid.Jump = true
-                                    elseif waypoint.Action == Enum.PathWaypointAction.Climb then
-                                        humanoid:MoveTo(waypoint.Position)
-                                        repeat wait() until (root.Position - waypoint.Position).magnitude < 2 or not _G.SmartFollowEnabled
-                                    else
-                                        humanoid:MoveTo(waypoint.Position)
-                                        repeat wait() until (root.Position - waypoint.Position).magnitude < 2 or not _G.SmartFollowEnabled
-                                    end
-                                end
-                            else
-                                humanoid:MoveTo(targetPos)
-                                wait(0.5)
-                            end
-                        else
-                            print("Target player lost or humanoid root missing.")
-                            break
-                        end
-                        wait(0.3)
-                    end
-                end)()
-            end
-        },
-
-        ["smartpath"] = {
-            ["ListName"] = "smartpath",
-            ["Description"] = "Create a smart path to given coordinates.",
-            ["Function"] = function(args, speaker)
-                if #args < 3 then
-                    print("Usage: smartpath x y z")
-                    return
-                end
-
-                local x, y, z = tonumber(args[11]), tonumber(args[12]), tonumber(args[13])
-                if not (x and y and z) then
-                    print("Invalid coordinates")
-                    return
-                end
-
-                local targetPos = Vector3.new(x, y, z)
-                local player = game.Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                local root = character:WaitForChild("HumanoidRootPart")
-                local pathfindingService = game:GetService("PathfindingService")
-
-                local path = pathfindingService:CreatePath({
-                    AgentRadius = 2,
-                    AgentHeight = 5,
-                    AgentCanJump = false,
-                    AgentCanClimb = true
-                })
-
-                path:ComputeAsync(root.Position, targetPos)
-
-                if path.Status == Enum.PathStatus.Success then
-                    for _, waypoint in pairs(path:GetWaypoints()) do
-                        local part = Instance.new("Part")
-                        part.Anchored = true
-                        part.CanCollide = false
-                        part.Size = Vector3.new(0.3, 0.3, 0.3)
-                        part.Shape = Enum.PartType.Ball
-                        part.Material = Enum.Material.Neon
-                        part.BrickColor = BrickColor.new("Bright yellow")
-                        part.Transparency = 0.5
-                        part.Position = waypoint.Position + Vector3.new(0,1,0)
-                        part.Parent = workspace
-                        game.Debris:AddItem(part, 3)
-                    end
-
-                    for _, waypoint in pairs(path:GetWaypoints()) do
-                        if waypoint.Action == Enum.PathWaypointAction.Jump then
-                            humanoid.Jump = true
-                        elseif waypoint.Action == Enum.PathWaypointAction.Climb then
-                            humanoid:MoveTo(waypoint.Position)
-                            repeat wait() until (root.Position - waypoint.Position).magnitude < 2
-                        else
-                            humanoid:MoveTo(waypoint.Position)
-                            repeat wait() until (root.Position - waypoint.Position).magnitude < 2
-                        end
-                    end
-                else
-                    print("Failed to find path to target location")
-                end
-            end
-        },
-
-        ["stopmove"] = {
-            ["ListName"] = "stopmove",
-            ["Description"] = "Stop all smart pathfinding and movement.",
-            ["Function"] = function(args,speaker)
-                _G.SmartTapEnabled = false
-                _G.SmartFollowEnabled = false
-                if _G.SmartTapConnection then
-                    _G.SmartTapConnection:Disconnect()
-                    _G.SmartTapConnection = nil
-                end
-
-                local player = game.Players.LocalPlayer
-                local character = player.Character
-                if character then
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    local root = character:FindFirstChild("HumanoidRootPart")
-                    if humanoid and root then
-                        humanoid:MoveTo(root.Position)
-                    end
-                end
-
-                print("All smart movements stopped.")
-            end
-        }
+    ["PluginName"] = "SmartMovement",
+    ["PluginDescription"] = "Advanced movement commands with smart pathfinding, following, and tap to move using Roblox PathfindingService with controlled jumping and optimized navigation.",
+    ["Commands"] = {},
+    ["State"] = {
+        SmartTapEnabled = false,
+        PathfindingAgent = nil,
+        CurrentTask = nil,
+        LastJumpTime = 0,
+        JumpCooldown = 0.6,  -- Adjusted cooldown to allow controlled jumps (prevents infinite air jumps)
     }
 }
 
-return Plugin
+local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
-Цитаты:
-[1] SimplePath - Pathfinding Module - Developer Forum | Roblox https://devforum.roblox.com/t/simplepath-pathfinding-module/1196762
-[2] How efficient is the built-in PathfindingService? - Scripting Support https://devforum.roblox.com/t/how-efficient-is-the-built-in-pathfindingservice/445903
-[3] How To Use Pathfinding Service In Roblox - Community Tutorials https://devforum.roblox.com/t/how-to-use-pathfinding-service-in-roblox/881628
-[4] NPC :MoveTo has a stuttering effect whilst using PathfindingService https://devforum.roblox.com/t/npc-moveto-has-a-stuttering-effect-whilst-using-pathfindingservice/3067241
-[5] Improving Pathfinding Quality With New Algorithm - Announcements https://devforum.roblox.com/t/improving-pathfinding-quality-with-new-algorithm/3258657
-[6] Pathfinding (AI, Dynamic Paths, Modifiers) - Roblox ... - YouTube https://www.youtube.com/watch?v=ckA4fVkAjIA
-[7] Faster, smarter and more efficient AI pathfinding needed https://devforum.roblox.com/t/faster-smarter-and-more-efficient-ai-pathfinding-needed/1624451
-[8] Deep dive on performance of NPCs and :MoveTo() https://devforum.roblox.com/t/deep-dive-on-performance-of-npcs-and-moveto/2650505
-[9] Is there a way to make Pathfinding service work on client? https://devforum.roblox.com/t/is-there-a-way-to-make-pathfinding-service-work-on-client/867033
-[10] PathfindingService doesn't always use agent params; makes service ... https://devforum.roblox.com/t/pathfindingservice-doesnt-always-use-agent-params-makes-service-unusable-for-large-characters/1394948
-[11] Infinite Yield plugin and theme manager - GitHub https://github.com/Infinite-Store/Infinite-Store
-[12] Шесть открытых библиотек от Mad Brains, которые упростят жизнь Flutter-разработчика — Разработка на vc.ru https://vc.ru/dev/641642-shest-otkrytyh-bibliotek-ot-mad-brains-kotorye-uprostyat-zhizn-flutter-razrabotchika
-[13] Infinite Library, easily install Infinite Yield Plugins - Reddit https://www.reddit.com/r/ROBLOXExploiting/comments/1isdqzx/infinite_library_easily_install_infinite_yield/
+-- Utility to draw debug path lines simulating "thinking"
+local function debugDrawPath(path)
+    for i = 1, #path - 1 do
+        local part0 = Instance.new("Part")
+        part0.Anchored = true
+        part0.CanCollide = false
+        part0.Size = Vector3.new(0.15, 0.15, (path[i].Position - path[i + 1].Position).Magnitude)
+        part0.CFrame = CFrame.new(path[i].Position:Lerp(path[i + 1].Position, 0.5), path[i + 1].Position)
+        part0.Transparency = 0.6
+        part0.BrickColor = BrickColor.new("Lime green")
+        part0.Parent = workspace
+        game.Debris:AddItem(part0, 3)
+    end
+end
+
+-- Detect if the part is a ladder (customize detection as needed)
+local function isLadder(part)
+    if not part then return false end
+    local name = part.Name:lower()
+    return name:find("ladder") or (part.Material == Enum.Material.Wood and part.Shape == Enum.PartType.Cylinder)
+end
+
+-- Controlled jumping to prevent infinite air jumps
+local function canJump()
+    local now = tick()
+    if now - Plugin.State.LastJumpTime >= Plugin.State.JumpCooldown then
+        Plugin.State.LastJumpTime = now
+        return true
+    end
+    return false
+end
+
+-- Move character along generated path waypoints with ladder climbing support
+local function moveCharacterAlongPath(waypoints)
+    local humanoid = Character:FindFirstChildOfClass("Humanoid")
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then return end
+
+    local index = 1
+    local function step()
+        if not Character.Parent then
+            if Plugin.State.CurrentTask then
+                Plugin.State.CurrentTask:Disconnect()
+                Plugin.State.CurrentTask = nil
+            end
+            return
+        end
+
+        if index > #waypoints then
+            humanoid:Move(Vector3.new(0, 0, 0))
+            if Plugin.State.CurrentTask then
+                Plugin.State.CurrentTask:Disconnect()
+                Plugin.State.CurrentTask = nil
+            end
+            return
+        end
+
+        local waypoint = waypoints[index]
+        local pos = hrp.Position
+        local targetPos = waypoint.Position
+        local direction = (targetPos - pos)
+        local dist = direction.Magnitude
+
+        -- Handling climbing based on PathWaypointAction and environment detection
+        if waypoint.Action == Enum.PathWaypointAction.Climb then
+            local rayOrigin = pos + Vector3.new(0, 3, 0)
+            local rayDirection = Vector3.new(0, -6, 0)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {workspace}
+            raycastParams.FilterType = Enum.RaycastFilterType.Whitelist
+            local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+            if raycastResult and isLadder(raycastResult.Instance) then
+                humanoid.Jump = false
+                -- Smoothly move character upward along ladder instead of jumping endlessly
+                hrp.CFrame = CFrame.new(targetPos)
+                index = index + 1
+                return
+            end
+        end
+
+        -- Close enough to waypoint, proceed to next
+        if dist < 3 then
+            index = index + 1
+        else
+            local moveDir = direction.Unit
+            local humState = humanoid:GetState()
+
+            -- Handle jumping with cooldown to prevent infinite jumping
+            if humState == Enum.HumanoidStateType.Freefall or humState == Enum.HumanoidStateType.Jumping then
+                if canJump() then
+                    humanoid.Jump = true
+                else
+                    humanoid.Jump = false
+                end
+            else
+                humanoid.Jump = false
+            end
+
+            humanoid:Move(moveDir, false)
+        end
+    end
+
+    if Plugin.State.CurrentTask then
+        Plugin.State.CurrentTask:Disconnect()
+        Plugin.State.CurrentTask = nil
+    end
+    Plugin.State.CurrentTask = RunService.Heartbeat:Connect(step)
+end
+
+-- Execute improved pathfinding with retries and optimized parameters
+local function moveToPosition(targetPosition)
+    local humanoid = Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local maxAttempts = 5
+    local computedPath = nil
+
+    for i = 1, maxAttempts do
+        local path = PathfindingService:CreatePath({
+            AgentRadius = 2,
+            AgentHeight = 5,
+            AgentCanJump = true,
+            AgentJumpHeight = 7,
+            AgentMaxSlope = 65,
+            CostMultiplier = 0.5
+        })
+        path:ComputeAsync(hrp.Position, targetPosition)
+        if path.Status == Enum.PathStatus.Success then
+            computedPath = path
+            break
+        end
+        task.wait(0.1)  -- Small wait before retry
+    end
+
+    if computedPath then
+        local waypoints = computedPath:GetWaypoints()
+        debugDrawPath(waypoints)
+        moveCharacterAlongPath(waypoints)
+    else
+        warn("SmartMovement: Failed to compute path after "..maxAttempts.." attempts.")
+    end
+end
+
+-- Player target identifier parser (supports various selectors)
+local function findPlayerByIdentifier(identifier)
+    if not identifier or #identifier == 0 then return {} end
+    identifier = identifier:lower()
+
+    if identifier == "me" then
+        return {LocalPlayer}
+    elseif identifier == "all" then
+        return Players:GetPlayers()
+    elseif identifier == "others" then
+        local list = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then table.insert(list, p) end
+        end
+        return list
+    elseif identifier:sub(1, 1) == "@" then
+        local username = identifier:sub(2)
+        local player = Players:FindFirstChild(username)
+        if player then return {player} end
+        local matches = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == username then
+                table.insert(matches, p)
+            end
+        end
+        return matches
+    elseif identifier == "random" then
+        local plist = Players:GetPlayers()
+        if #plist == 0 then return {} end
+        return {plist[math.random(1, #plist)]}
+    elseif identifier:sub(1, 1) == "%" then
+        local teamName = identifier:sub(2)
+        local teamPlayers = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Team and p.Team.Name:lower() == teamName then
+                table.insert(teamPlayers, p)
+            end
+        end
+        return teamPlayers
+    elseif identifier == "nearest" then
+        local nearestPlayer = nil
+        local nearestDistance = math.huge
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (p.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if dist < nearestDistance then
+                    nearestDistance = dist
+                    nearestPlayer = p
+                end
+            end
+        end
+        return nearestPlayer and {nearestPlayer} or {}
+    else
+        -- Partial name match fallback
+        local matches = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower():find(identifier) then
+                table.insert(matches, p)
+            end
+        end
+        return matches
+    end
+end
+
+-- Command: toggles smarttap on/off; moves player to clicked location using pathfinding
+Plugin.Commands["smarttap"] = {
+    ["ListName"] = "smarttap",
+    ["Description"] = "Toggle smart tap to move (pathfinding-based)",
+    ["Aliases"] = {"stap"},
+    ["Function"] = function(args)
+        Plugin.State.SmartTapEnabled = not Plugin.State.SmartTapEnabled
+        if Plugin.State.SmartTapEnabled then
+            local mouse = LocalPlayer:GetMouse()
+            local conn
+            conn = mouse.Button1Down:Connect(function()
+                if not Plugin.State.SmartTapEnabled then
+                    conn:Disconnect()
+                    return
+                end
+                local target = mouse.Hit.Position
+                moveToPosition(target)
+            end)
+            Plugin.State.SmartTapConnection = conn
+            print("SmartTap enabled")
+        else
+            if Plugin.State.SmartTapConnection then
+                Plugin.State.SmartTapConnection:Disconnect()
+                Plugin.State.SmartTapConnection = nil
+            end
+            if Plugin.State.CurrentTask then
+                Plugin.State.CurrentTask:Disconnect()
+                Plugin.State.CurrentTask = nil
+            end
+            print("SmartTap disabled")
+        end
+    end
+}
+
+-- Command: smartfollow follows the specified player with dynamic path updates using smart pathfinding
+Plugin.Commands["smartfollow"] = {
+    ["ListName"] = "smartfollow",
+    ["Description"] = "Follow a specified player smartly with pathfinding",
+    ["Aliases"] = {"sfollow"},
+    ["Function"] = function(args)
+        if not args[1] then
+            print("Usage: smartfollow <player identifier>")
+            return
+        end
+        local targets = findPlayerByIdentifier(args[1])
+        if #targets == 0 then
+            print("No matching player found for: "..args[1])
+            return
+        end
+        local target = targets[1]
+        print("Following player:", target.Name)
+        if Plugin.State.CurrentTask then
+            Plugin.State.CurrentTask:Disconnect()
+            Plugin.State.CurrentTask = nil
+        end
+
+        local humanoid = Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then
+            print("Humanoid not found")
+            return
+        end
+
+        local followConn
+        followConn = RunService.Heartbeat:Connect(function()
+            if not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+            if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+
+            local targetPos = target.Character.HumanoidRootPart.Position
+            local currentPos = Character.HumanoidRootPart.Position
+            local dist = (targetPos - currentPos).Magnitude
+
+            if dist > 5 then
+                moveToPosition(targetPos)
+            else
+                humanoid:Move(Vector3.new(0, 0, 0))
+            end
+        end)
+
+        Plugin.State.CurrentTask = followConn
+    end
+}
+
+-- Command: smartpath moves player to specified coordinates intelligently
+Plugin.Commands["smartpath"] = {
+    ["ListName"] = "smartpath",
+    ["Description"] = "Move to specified position smartly using pathfinding",
+    ["Aliases"] = {"spath"},
+    ["Function"] = function(args)
+        if #args < 3 then
+            print("Usage: smartpath <x> <y> <z>")
+            return
+        end
+        local x = tonumber(args[1])
+        local y = tonumber(args[2])
+        local z = tonumber(args[3])
+        if not x or not y or not z then
+            print("Invalid coordinates; usage: smartpath <x> <y> <z>")
+            return
+        end
+        moveToPosition(Vector3.new(x, y, z))
+    end
+}
+
+-- Command: stopmove disables all movement and cancels ongoing pathfinding tasks
+Plugin.Commands["stopmove"] = {
+    ["ListName"] = "stopmove",
+    ["Description"] = "Stop all movement and ongoing tasks",
+    ["Aliases"] = {"smove"},
+    ["Function"] = function()
+        if Plugin.State.SmartTapEnabled and Plugin.State.SmartTapConnection then
+            Plugin.State.SmartTapConnection:Disconnect()
+            Plugin.State.SmartTapConnection = nil
+            Plugin.State.SmartTapEnabled = false
+        end
+        if Plugin.State.CurrentTask then
+            Plugin.State.CurrentTask:Disconnect()
+            Plugin.State.CurrentTask = nil
+        end
+        local humanoid = Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:Move(Vector3.new(0, 0, 0))
+            humanoid.Jump = false
+        end
+        print("All movement stopped")
+    end
+}
+
+return Plugin
