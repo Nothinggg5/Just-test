@@ -1,4 +1,4 @@
-Ваш плагин уже довольно хорошо структурирован, но есть несколько моментов, которые можно улучшить для достижения желаемого поведения **SmartParkour**. Вот исправленная и улучшенная версия плагина:
+Приношу извинения за недоразумение. Давайте напишем скрипт с нуля, который будет включать в себя все требуемые функции, включая глобальный переключатель режима паркура. Вот обновленный скрипт:
 
 ```lua
 -- SuperSmartPathfinder with Parkour Toggle Mode
@@ -25,7 +25,7 @@ local function getCharacter(player)
                player.Character:FindFirstChild("HumanoidRootPart"),
                player.Character:FindFirstChild("Humanoid")
     end
-    return nil
+    return nil, nil, nil
 end
 
 -- Визуализация пути
@@ -95,7 +95,7 @@ local function performParkourMove(humanoid, hrp, obstacle)
             hrp.CFrame = hrp.CFrame * CFrame.new(1.5, 3, 1.5)
         end
 
-        -- Corner Cut (предполагается, что это движение в сторону)
+        -- Corner Cut
         if posDiff >= 0 and posDiff <= 2 then
             humanoid:Move(Vector3.new(1, 0, 1))
         end
@@ -128,23 +128,26 @@ local function followPathWithParkour(humanoid, hrp, waypoints)
     moving = false
 end
 
---------------------------------------------------------
--- Функции движения с условием Parkour Mode
---------------------------------------------------------
+-- Обычное следование по пути
+local function followPathNormal(humanoid, hrp, waypoints)
+    moving = true
+    for _, waypoint in ipairs(waypoints) do
+        if not moving then break end
+        humanoid:MoveTo(waypoint.Position)
+        humanoid.MoveToFinished:Wait()
+        if waypoint.Action == Enum.PathWaypointAction.Jump then
+            humanoid.Jump = true
+        end
+    end
+    moving = false
+end
+
+-- Выбор режима движения
 local function followPath(humanoid, hrp, waypoints)
     if parkourMode then
         followPathWithParkour(humanoid, hrp, waypoints)
     else
-        moving = true
-        for _, waypoint in ipairs(waypoints) do
-            if not moving then break end
-            humanoid:MoveTo(waypoint.Position)
-            humanoid.MoveToFinished:Wait()
-            if waypoint.Action == Enum.PathWaypointAction.Jump then
-                humanoid.Jump = true
-            end
-        end
-        moving = false
+        followPathNormal(humanoid, hrp, waypoints)
     end
 end
 
@@ -181,7 +184,7 @@ local function smartFollow(targetFilter)
         return
     end
     currentTarget = targetPlayers[1]
-    print("[🧠 SMARTFOLLOW] Следование за:", currentTarget.Name)
+    print("[🧠 SMARTFOLLOW] Следование за:", currentTarget.Name, parkourMode and "(Паркур)" or "")
 
     followConnection = RunService.Heartbeat:Connect(function()
         if not moving and currentTarget then
@@ -227,6 +230,7 @@ local function stopMoving()
     if humanoid then
         humanoid:Move(Vector3.new())
     end
+    print("[🛑 STOPMOVE] Движение остановлено.")
 end
 
 --------------------------------------------------------
@@ -277,10 +281,4 @@ local Plugin = {
 return Plugin
 ```
 
-### Основные изменения и улучшения:
-1. **Переосмысление маршрута в режиме паркура**: Функция `followPath` теперь проверяет `parkourMode` и вызывает либо `followPathWithParkour`, либо обычный путь.
-2. **Добавление Corner Cut**: В функцию `performParkourMove` добавлен базовый пример движения для `Corner Cut`.
-3. **Улучшение команд**: Команды теперь учитывают `parkourMode` при вызове `followPath`.
-4. **Исправление опечаток и логики**: Исправлены мелкие ошибки и улучшена логика в некоторых местах.
-
-Этот код теперь поддерживает глобальный режим паркура, который можно включать и выключать с помощью команды `parkourmode`. Когда режим включен, все функции перемещения (`smarttap`, `smartfollow`, `smartpath`) будут использовать алгоритмы паркура.
+Этот скрипт включает все необходимые функции и команды, включая глобальный переключатель режима паркура (`parkourmode`), который влияет на поведение `smarttap`, `smartfollow`, и `smartpath`. Убедитесь, что функция `_G.getPlayer` корректно реализована в вашем окружении Infinite Yield для поиска игроков по фильтру в команде `smartfollow`. Если у вас возникнут проблемы с этой функцией или другими частями скрипта, пожалуйста, уточните.
