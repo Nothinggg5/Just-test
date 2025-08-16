@@ -1,18 +1,19 @@
-local Plugin = {
-    PluginName = "SmartNavigator",
-    PluginDescription = "Умный tap-to-move, следование и построение маршрута с визуализацией пути и стоп-краном",
-    Commands = {}
-}
-
 local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+
+local Plugin = {
+    ["PluginName"] = "SmartNavigator",
+    ["PluginDescription"] = "Умный tap-to-move, следование и построение пути с визуализацией и стоп-краном",
+    ["Commands"] = {}
+}
 
 local smartTapEnabled = false
 local currentMoveConnection = nil
 local currentFollowTask = nil
 local currentPathTask = nil
 
+-- Вспомогательная функция для отрисовки линий пути
 local function drawDebugPath(points)
     for i = 1, #points - 1 do
         local part = Instance.new("Part")
@@ -30,54 +31,48 @@ local function drawDebugPath(points)
     end
 end
 
+-- Останавливает все текущие действия и движения
 local function cancelCurrentTasks()
     if currentMoveConnection then
         currentMoveConnection:Disconnect()
         currentMoveConnection = nil
     end
-    if currentFollowTask then
-        currentFollowTask = nil
-    end
-    if currentPathTask then
-        currentPathTask = nil
-    end
+    currentFollowTask = nil
+    currentPathTask = nil
+
     local player = Players.LocalPlayer
     if player and player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid:MoveTo(player.Character.HumanoidRootPart.Position)
+        local humanoid = player.Character.Humanoid
+        humanoid:MoveTo(player.Character.HumanoidRootPart.Position)
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
     end
 end
 
--- Команда stopmove
-Plugin.Commands["stopmove"] = {
-    ListName = "stopmove",
-    Description = "Останавливает все действия и движения",
-    Function = function(args, speaker)
-        cancelCurrentTasks()
-    end
-}
-
--- smarttap переключатель
+-- smarttap (переключатель)
 Plugin.Commands["smarttap"] = {
-    ListName = "smarttap",
-    Description = "Включить/выключить умный tap-to-move (клик для движения)",
-    Function = function(args, speaker)
+    ["ListName"] = "smarttap",
+    ["Description"] = "Включить/выключить умный tap-to-move (нажмите мышь, чтобы идти)",
+    ["Aliases"] = {},
+    ["Function"] = function(args, speaker)
         smartTapEnabled = not smartTapEnabled
         local player = Players.LocalPlayer
+        local mouse = player:GetMouse()
+
         if smartTapEnabled then
-            currentMoveConnection = player:GetMouse().Button1Down:Connect(function()
+            if currentMoveConnection then currentMoveConnection:Disconnect() end
+            currentMoveConnection = mouse.Button1Down:Connect(function()
                 if not smartTapEnabled then return end
-                local mouse = player:GetMouse()
                 local char = player.Character
                 if not char or not char.PrimaryPart then return end
-                local target = mouse.Hit.Position
                 cancelCurrentTasks()
+                local targetPos = mouse.Hit.p
                 local path = PathfindingService:CreatePath({
                     AgentRadius = 2,
                     AgentHeight = 5,
                     AgentCanJump = false,
                     AgentCanClimb = true
                 })
-                path:ComputeAsync(char.PrimaryPart.Position, target)
+                path:ComputeAsync(char.PrimaryPart.Position, targetPos)
                 if path.Status == Enum.PathStatus.Success then
                     local waypoints = path:GetWaypoints()
                     local points = {}
@@ -86,70 +81,83 @@ Plugin.Commands["smarttap"] = {
                     end
                     drawDebugPath(points)
                     for _, wp in ipairs(waypoints) do
-                        char.Humanoid:MoveTo(wp.Position)
-                        local reached = char.Humanoid.MoveToFinished:Wait()
-                        if not reached then break end
+                        humanoid = char:FindFirstChild("Humanoid")
+                        if not humanoid then break end
+                        humanoid:MoveTo(wp.Position)
+                        if not humanoid.MoveToFinished:Wait() then break end
                     end
                 end
             end)
+            print("SmartTap включён")
         else
+            if currentMoveConnection then
+                currentMoveConnection:Disconnect()
+                currentMoveConnection = nil
+            end
             cancelCurrentTasks()
+            print("SmartTap выключен")
         end
     end
 }
 
--- smartpath команда
+-- smartpath команда на основе координат
 Plugin.Commands["smartpath"] = {
-    ListName = "smartpath",
-    Description = "Построить и пройти маршрут к координатам: smartpath x y z",
-    Function = function(args, speaker)
+    ["ListName"] = "smartpath",
+    ["Description"] = "Построить и пройти путь к координатам: smartpath x y z",
+    ["Aliases"] = {},
+    ["Function"] = function(args, speaker)
         local player = Players.LocalPlayer
         if not player.Character or not player.Character.PrimaryPart then return end
         local x, y, z = tonumber(args[1]), tonumber(args[2]), tonumber(args[3])
         if not (x and y and z) then return end
         cancelCurrentTasks()
+
         currentPathTask = task.spawn(function()
             local startPos = player.Character.PrimaryPart.Position
-            local goalPos = Vector3.new(x, y, z)
+            local targetPos = Vector3.new(x, y, z)
             local path = PathfindingService:CreatePath({
                 AgentRadius = 2,
                 AgentHeight = 5,
                 AgentCanJump = false,
                 AgentCanClimb = true
             })
-            path:ComputeAsync(startPos, goalPos)
+            path:ComputeAsync(startPos, targetPos)
             if path.Status == Enum.PathStatus.Success then
-                local waypoints = path:GetWaypoints()
+                local wps = path:GetWaypoints()
                 local points = {}
-                for i, wp in ipairs(waypoints) do
+                for i, wp in ipairs(wps) do
                     points[i] = wp.Position
                 end
                 drawDebugPath(points)
-                for _, wp in ipairs(waypoints) do
-                    player.Character.Humanoid:MoveTo(wp.Position)
-                    local reached = player.Character.Humanoid.MoveToFinished:Wait()
-                    if not reached then break end
+                local humanoid = player.Character:FindFirstChild("Humanoid")
+                if not humanoid then return end
+                for _, wp in ipairs(wps) do
+                    humanoid:MoveTo(wp.Position)
+                    if not humanoid.MoveToFinished:Wait() then break end
                 end
+            else
+                warn("Путь не может быть построен")
             end
         end)
     end
 }
 
--- smartfollow команда
+-- smartfollow команда для следования по селектору
 Plugin.Commands["smartfollow"] = {
-    ListName = "smartfollow",
-    Description = "Следовать за игроком по селектору: smartfollow <selector>",
-    Function = function(args, speaker)
-        local selector = args[1]
+    ["ListName"] = "smartfollow",
+    ["Description"] = "Следовать за игроком или группой: smartfollow <селектор>",
+    ["Aliases"] = {},
+    ["Function"] = function(args, speaker)
         local player = Players.LocalPlayer
         if not player.Character or not player.Character.PrimaryPart then return end
+        local selector = args[1]
         if not selector then return end
         cancelCurrentTasks()
 
         local function resolveTargets(sel)
-            -- Поддержка основных селекторов
             sel = sel:lower()
             local targets = {}
+
             if sel == "me" then
                 table.insert(targets, player)
             elseif sel == "all" then
@@ -207,11 +215,14 @@ Plugin.Commands["smartfollow"] = {
                         points[i] = wp.Position
                     end
                     drawDebugPath(points)
+                    local humanoid = player.Character:FindFirstChild("Humanoid")
+                    if not humanoid then break end
                     for _, wp in ipairs(waypoints) do
-                        player.Character.Humanoid:MoveTo(wp.Position)
-                        local reached = player.Character.Humanoid.MoveToFinished:Wait()
-                        if not reached then break end
+                        humanoid:MoveTo(wp.Position)
+                        if not humanoid.MoveToFinished:Wait() then break end
                     end
+                else
+                    warn("Путь для следования не построен")
                 end
                 task.wait(0.5)
             end
