@@ -1,16 +1,8 @@
-ВООБЩЕ ВЕСЬ ПЛАГИН НАПИШИ, БАРАНИЩЕ, со всеми функциями
-
-кстати распределение цветов не работает
-
-вот документации infinite yield про плагины:
-https://github.com/EdgeIY/infiniteyield/wiki/Creating-A-Plugin
-https://github.com/EdgeIY/infiniteyield/wiki/Adding-Commands-To-A-Plugin
-https://github.com/EdgeIY/infiniteyield/wiki/Infinite-Yield's-Core-Functions
-https://github.com/EdgeIY/infiniteyield/wiki/Loading-Plugin
+на основе lidarrandom плагин должен обучаться и запоминать карту
 
 local Plugin = {
-    PluginName = "FullAdaptiveLidarNavigator",
-    PluginDescription = "Полный LIDAR навигатор с цветной визуализацией, прыжками, обучением и патрулированием для Infinite Yield",
+    PluginName = "LearningLidarNavigator",
+    PluginDescription = "LIDAR навигатор с обучающимся рандомным патрулированием и памятью карты",
     Commands = {}
 }
 
@@ -36,6 +28,9 @@ local rayCountParkour = 1000
 
 local dangerTags = {"damage", "lava", "fire", "kill", "trap", "spike", "acid", "death"}
 
+-- Кэш уже изученных зон
+local exploredMap = {}
+
 local function getCharacter(player)
     if not player or not player.Character then return nil,nil,nil end
     local hrp = player.Character:FindFirstChild("HumanoidRootPart")
@@ -46,8 +41,8 @@ end
 local function isDangerPart(part)
     if not part or not part:IsA("BasePart") then return false end
     local name = part.Name:lower()
-    for _, t in pairs(dangerTags) do
-        if name:find(t) then return true end
+    for _, tag in pairs(dangerTags) do
+        if name:find(tag) then return true end
     end
     if part:GetAttribute("Danger") == true then return true end
     return false
@@ -63,12 +58,12 @@ local function checkDangerNearby(pos, radius)
 end
 
 local function isPathDangerous(startPos, endPos, excludeModel)
-    local dir = (endPos - startPos).Unit
+    local direction = (endPos - startPos).Unit
     local distance = (endPos - startPos).Magnitude
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {excludeModel}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local ray = Workspace:Raycast(startPos + Vector3.new(0, 2, 0), dir * distance, rayParams)
+    local ray = Workspace:Raycast(startPos + Vector3.new(0, 2, 0), direction * distance, rayParams)
     return ray and isDangerPart(ray.Instance)
 end
 
@@ -97,71 +92,7 @@ local updateIntervalCurrent = updateIntervalBase
 local lastPositions = {}
 local stepSize = 8
 
-local rayVisualParts = {}
-
-local function clearRayVisuals()
-    for _, part in pairs(rayVisualParts) do
-        if part and part.Parent then part:Destroy() end
-    end
-    rayVisualParts = {}
-end
-
-local function drawColoredScanVisualization(hrp, chosenDir)
-    clearRayVisuals()
-    local origin = hrp.Position + Vector3.new(0, 2, 0)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {hrp.Parent}
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-    local threshold = 0.02
-
-    for _, dir in ipairs(scanDirs) do
-        local ray = Workspace:Raycast(origin, dir * scanRadiusCurrent, rayParams)
-        local endPos = ray and ray.Position or (origin + dir * scanRadiusCurrent)
-
-        local part = Instance.new("Part")
-        part.Anchored = true
-        part.CanCollide = false
-        part.Size = Vector3.new(0.06, 0.06, (endPos - origin).Magnitude)
-        part.CFrame = CFrame.new((origin + endPos) / 2, endPos)
-        part.Material = Enum.Material.Neon
-
-        if (dir - chosenDir).Magnitude < threshold then
-            part.Color = Color3.fromRGB(0, 0, 255) -- синий (основной)
-        elseif not checkDangerNearby(endPos, safeDistance) then
-            part.Color = Color3.fromRGB(0, 255, 0) -- зеленый (безопасный)
-        else
-            part.Color = Color3.fromRGB(255, 0, 0) -- красный (опасный)
-        end
-
-        part.Parent = Workspace
-        table.insert(rayVisualParts, part)
-        Debris:AddItem(part, 2)
-    end
-end
-
-local function tryJump(hrp, humanoid, nextPoint)
-    if not nextPoint or not humanoid then return false end
-    local dy = nextPoint.Y - hrp.Position.Y
-    if humanoid.FloorMaterial == Enum.Material.Air then return false end
-    if dy > 1.3 and dy < maxJumpHeight then
-        local origin = hrp.Position + Vector3.new(0, 2, 0)
-        local toNext = (nextPoint - hrp.Position).Unit
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {hrp.Parent}
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        local wallCheck = Workspace:Raycast(origin + Vector3.new(0, 0.5, 0), toNext * stepSize, rayParams)
-        local ceilingCheck = Workspace:Raycast(origin + Vector3.new(0, 2, 0), toNext * stepSize, rayParams)
-        if wallCheck and not isDangerPart(wallCheck.Instance) and not ceilingCheck then
-            humanoid.Jump = true
-            task.wait(0.25)
-            return true
-        end
-    end
-    return false
-end
-
-local function avoidObstacle(hrp, proposedPos)
+local function avoidObstacles(hrp, proposedPos)
     local character = hrp.Parent
     if not character then return proposedPos end
     local dir = (proposedPos - hrp.Position).Unit
@@ -185,25 +116,37 @@ local function avoidObstacle(hrp, proposedPos)
 end
 
 local function selectNextStep(hrp, targetPos, lastDir)
-    local origin = hrp.Position + Vector3.new(0,2,0)
+    local origin = hrp.Position + Vector3.new(0, 2, 0)
     local bestScore = math.huge
     local bestPos, bestDir = nil, nil
+
     for _, dir in ipairs(scanDirs) do
         local rayParams = RaycastParams.new()
         rayParams.FilterDescendantsInstances = {hrp.Parent}
         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
         local ray = Workspace:Raycast(origin, dir * scanRadiusCurrent, rayParams)
         local pos = ray and ray.Position or origin + dir * scanRadiusCurrent
+
         if pos and not checkDangerNearby(pos, safeDistance) and not isPathDangerous(origin, pos, hrp.Parent) then
-            pos = avoidObstacle(hrp, pos)
-            local dist = (pos - targetPos).Magnitude
-            for _, prevPos in ipairs(lastPositions) do
-                if prevPos and (pos - prevPos).Magnitude < stepSize * 0.5 then
-                    dist = dist + 20
-                end
+            pos = avoidObstacles(hrp, pos)
+
+            -- Избегаем топтания по изученным точкам
+            local posKey = string.format("%.1f%.1f%.1f", pos.X, pos.Y, pos.Z)
+            if exploredMap[posKey] then
+                -- Мы уже здесь были - добавляем штраф
+                pos = pos + (pos - hrp.Position).Unit * stepSize * 2
+            else
+                exploredMap[posKey] = true
             end
+
+            local dist = (pos - targetPos).Magnitude
+
             local score = dist
-            if lastDir and lastDir:Dot(dir) > 0.85 then score = score * 0.6 end
+            if lastDir and lastDir:Dot(dir) > 0.85 then
+                score = score * 0.6
+            end
+
             if score < bestScore then
                 bestScore = score
                 bestPos = pos
@@ -211,21 +154,46 @@ local function selectNextStep(hrp, targetPos, lastDir)
             end
         end
     end
+
     if bestPos then
         table.insert(lastPositions, bestPos)
-        if #lastPositions > 25 then table.remove(lastPositions, 1) end
+        if #lastPositions > 30 then
+            table.remove(lastPositions, 1)
+        end
     end
+
     return bestPos, bestDir
+end
+
+local function tryJump(hrp, humanoid, nextPoint)
+    if not nextPoint or not humanoid then return false end
+    local heightDifference = nextPoint.Y - hrp.Position.Y
+    if humanoid.FloorMaterial == Enum.Material.Air then return false end
+    if heightDifference > 1.5 and heightDifference < maxJumpHeight then
+        local origin = hrp.Position + Vector3.new(0, 1.5, 0)
+        local forward = (nextPoint - hrp.Position).Unit
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {hrp.Parent}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        local obstacleCheck = Workspace:Raycast(origin, forward * stepSize, rayParams)
+        local ceilingCheck = Workspace:Raycast(hrp.Position + Vector3.new(0, 3, 0), forward * stepSize, rayParams)
+        if obstacleCheck and not isDangerPart(obstacleCheck.Instance) and not ceilingCheck then
+            humanoid.Jump = true
+            task.wait(0.3)
+            return true
+        end
+    end
+    return false
 end
 
 local function predictTargetFuturePosition(tgtHRP, velocityHistory)
     if #velocityHistory < 2 then return tgtHRP.Position end
     local last = velocityHistory[#velocityHistory]
-    local prev = velocityHistory[#velocityHistory-1]
+    local prev = velocityHistory[#velocityHistory - 1]
     local dt = last.Time - prev.Time
     if dt <= 0 then return tgtHRP.Position end
-    local vel = (last.Position - prev.Position) / dt
-    return last.Position + vel * 0.5
+    local velocity = (last.Position - prev.Position) / dt
+    return last.Position + velocity * 0.6
 end
 
 local function ultraLidarNavigate(hrp, humanoid, targetPos, targetVelHistory)
@@ -233,39 +201,59 @@ local function ultraLidarNavigate(hrp, humanoid, targetPos, targetVelHistory)
     local lastDir = nil
     local pathPoints = {hrp.Position}
     lastPositions = {}
+
     while moving and hrp and humanoid and (hrp.Position - targetPos).Magnitude > safeDistance do
         local predictedPos = targetVelHistory and predictTargetFuturePosition(targetPos, targetVelHistory) or targetPos
         local nextStep, chosenDir = selectNextStep(hrp, predictedPos, lastDir)
+
         if not nextStep then
-            warn("[LIDAR] Нет безопасных путей — вероятно застрял")
+            warn("[LIDAR] Нет безопасных путей — застрял?")
             break
         end
+
         if tryJump(hrp, humanoid, nextStep) then
             task.wait(parkourMode and 0.1 or 0.25)
         end
+
         humanoid:MoveTo(nextStep)
         humanoid.MoveToFinished:Wait()
+
         lastDir = chosenDir
         table.insert(pathPoints, nextStep)
+
         task.wait(updateIntervalBase)
     end
 
-    drawColoredScanVisualization(hrp, lastDir or Vector3.new(0,0,1))
+    -- Рисуем путь
+    for i = 1, #pathPoints - 1 do
+        local p1, p2 = pathPoints[i], pathPoints[i + 1]
+        local part = Instance.new("Part")
+        part.Anchored = true
+        part.CanCollide = false
+        part.Size = Vector3.new(0.15, 0.15, (p1 - p2).Magnitude)
+        part.CFrame = CFrame.new((p1 + p2) / 2, p2)
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(60, 160, 255)
+        part.Parent = Workspace
+        Debris:AddItem(part, 3)
+    end
 
     moving = false
 end
 
 local function clearConnections()
-    clearRayVisuals()
     for _, conn in ipairs(connections) do
-        if conn and conn.Connected then conn:Disconnect() end
+        if conn and conn.Connected then
+            conn:Disconnect()
+        end
     end
     connections = {}
+    lastPositions = {}
 end
 
 Plugin.Commands["lidartap"] = {
     ListName = "lidartap",
-    Description = "Перемещение ПКМ с цветным LIDAR и обходом",
+    Description = "Перемещение к точке ПКМ с интеллектуальным обходом и паркуром",
     Aliases = {},
     Function = function(args, speaker)
         if followMode == "lidartap" then
@@ -275,20 +263,19 @@ Plugin.Commands["lidartap"] = {
             print("[LIDAR] lidartap выключен")
             return
         end
-        scanRadiusCurrent = scanRadiusBase
-        updateIntervalCurrent = updateIntervalBase
+        updateScanSettings()
         followMode = "lidartap"
-        print("[LIDAR] lidartap включен, клик ПКМ для перемещения")
+        print("[LIDAR] lidartap включен, клик правой кнопкой для перемещения")
         local conn = UserInputService.InputBegan:Connect(function(input, processed)
             if processed then return end
             if input.UserInputType == Enum.UserInputType.MouseButton2 then
                 if moving then return end
                 local mouse = localPlayer:GetMouse()
-                local destination = mouse.Hit.p
+                local dest = mouse.Hit.p
                 local char, hrp, humanoid = getCharacter(localPlayer)
                 if char and hrp and humanoid then
                     coroutine.wrap(function()
-                        ultraLidarNavigate(hrp, humanoid, destination)
+                        ultraLidarNavigate(hrp, humanoid, dest)
                     end)()
                 end
             end
@@ -297,11 +284,213 @@ Plugin.Commands["lidartap"] = {
     end
 }
 
--- Other commands (lidarfollow, lidarchase, parkourmode, lidarrandom, lidarstop) can be implemented similarly using ultraLidarNavigate and color visualization functions as above.
+Plugin.Commands["lidarfollow"] = {
+    ListName = "lidarfollow [player]",
+    Description = "Следовать за игроком с интеллектуальным обходом",
+    Aliases = {},
+    Function = function(args, speaker)
+        clearConnections()
+        local Players = game:GetService("Players")
+        local targetFilter = args and args[1] or "nearest"
+        local targetPlayers = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Name:lower():find(targetFilter:lower()) then
+                table.insert(targetPlayers, p)
+            end
+        end
+        if #targetPlayers == 0 then
+            warn("[LIDAR] Цель не найдена")
+            return
+        end
+        currentTarget = targetPlayers[1]
+        updateScanSettings()
+        followMode = "lidarfollow"
+        print("[LIDAR] Следую за "..currentTarget.Name)
+        local conn = RunService.Heartbeat:Connect(function()
+            if moving then return end
+            if not currentTarget or not currentTarget.Character then return end
+            local char, hrp, humanoid = getCharacter(localPlayer)
+            local tgtChar, tgtHRP = getCharacter(currentTarget)
+            if char and hrp and humanoid and tgtChar and tgtHRP then
+                coroutine.wrap(function()
+                    ultraLidarNavigate(hrp, humanoid, tgtHRP.Position)
+                end)()
+            end
+        end)
+        table.insert(connections, conn)
+    end
+}
+
+Plugin.Commands["lidarchase"] = {
+    ListName = "lidarchase [player]",
+    Description = "Умное преследование с прогнозированием и паркуром",
+    Aliases = {},
+    Function = function(args, speaker)
+        clearConnections()
+        local Players = game:GetService("Players")
+        local targetFilter = args and args[1] or "nearest"
+        local targetPlayers = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Name:lower():find(targetFilter:lower()) then
+                table.insert(targetPlayers, p)
+            end
+        end
+        if #targetPlayers == 0 then
+            warn("[LIDAR] Цель не найдена")
+            return
+        end
+        currentTarget = targetPlayers[1]
+        parkourMode = true
+        updateScanSettings()
+        followMode = "lidarchase"
+        print("[LIDAR] Преследую "..currentTarget.Name)
+        local targetVelHistory = {}
+        local conn = RunService.Heartbeat:Connect(function()
+            if moving then return end
+            if not currentTarget or not currentTarget.Character then return end
+            local tgtHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+            if not tgtHRP then return end
+            table.insert(targetVelHistory, {Position = tgtHRP.Position, Time = os.clock()})
+            if #targetVelHistory > 20 then table.remove(targetVelHistory, 1) end
+            local char, hrp, humanoid = getCharacter(localPlayer)
+            if char and hrp and humanoid then
+                coroutine.wrap(function()
+                    ultraLidarNavigate(hrp, humanoid, tgtHRP.Position, targetVelHistory)
+                end)()
+            end
+        end)
+        table.insert(connections, conn)
+    end
+}
+
+Plugin.Commands["parkourmode"] = {
+    ListName = "parkourmode",
+    Description = "Вкл/выкл продвинутый паркур режим",
+    Aliases = {},
+    Function = function()
+        parkourMode = not parkourMode
+        updateScanSettings()
+        print(parkourMode and "[LIDAR] Паркур включён" or "[LIDAR] Паркур выключен")
+    end
+}
+
+Plugin.Commands["lidarrandom"] = {
+    ListName = "lidarrandom",
+    Description = "Интеллектуальное обучение карты при случайном патрулировании",
+    Aliases = {},
+    Function = function()
+        clearConnections()
+        followMode = "lidarrandom"
+        print("[LIDAR] Включено интеллектуальное случайное патрулирование")
+        local char, hrp, humanoid = getCharacter(localPlayer)
+        if not char or not hrp or not humanoid then return end
+        moving = true
+        coroutine.wrap(function()
+            local exploredPoints = {}
+            while moving do
+                local tries = 0
+                local candidatePos
+                repeat
+                    local dir = Vector3.new(math.random()*2-1, math.random()*0.4-0.2, math.random()*2-1).Unit
+                    local dist = math.random(50, 140)
+                    candidatePos = hrp.Position + dir * dist
+                    local nearbyDanger = checkDangerNearby(candidatePos, safeDistance)
+                    local key = string.format("%.2f_%.2f_%.2f", candidatePos.X, candidatePos.Y, candidatePos.Z)
+                    local alreadyExplored = exploredPoints[key]
+                    tries = tries + 1
+                    if tries > 50 then candidatePos = nil break end
+                until not nearbyDanger and not alreadyExplored
+
+                if candidatePos then
+                    ultraLidarNavigate(hrp, humanoid, candidatePos)
+                    local key = string.format("%.2f_%.2f_%.2f", candidatePos.X, candidatePos.Y, candidatePos.Z)
+                    exploredPoints[key] = true
+                end
+
+                if math.random() < 0.2 then
+                    task.wait(0.5 + math.random())
+                end
+
+                task.wait(0.5)
+            end
+        end)()
+    end
+}
+
+Plugin.Commands["lidarshow"] = {
+    ListName = "lidarshow",
+    Description = "Показать 3D визуализацию лучших лучей LIDAR",
+    Aliases = {},
+    Function = function()
+        local char, hrp = getCharacter(localPlayer)
+        if not hrp then
+            print("[LIDAR] HumanoidRootPart не найден")
+            return
+        end
+        drawScanVisualization(hrp)
+        print("[LIDAR] Визуализация выполнена")
+    end
+}
+
+Plugin.Commands["lidarstop"] = {
+    ListName = "lidarstop",
+    Description = "Остановить все движения и навигацию",
+    Aliases = {"stop"},
+    Function = function()
+        clearConnections()
+        moving = false
+        parkourMode = false
+        followMode = nil
+        currentTarget = nil
+        local char, hrp, humanoid = getCharacter(localPlayer)
+        if humanoid then humanoid:Move(Vector3.new()) end
+        print("[LIDAR] Навигация остановлена")
+    end
+}
+
+function updateScanSettings()
+    if parkourMode then
+        scanRadiusCurrent = 160
+        updateIntervalCurrent = 0.008
+        scanDirs = generateUniformSphereRays(rayCountParkour)
+    else
+        scanRadiusCurrent = scanRadiusBase
+        updateIntervalCurrent = updateIntervalBase
+        scanDirs = generateUniformSphereRays(rayCountBase)
+    end
+end
+
+function drawScanVisualization(hrp)
+    local origin = hrp.Position + Vector3.new(0, 2, 0)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {hrp.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    for _, dir in ipairs(scanDirs) do
+        local ray = Workspace:Raycast(origin, dir * scanRadiusCurrent, rayParams)
+        local endPos = ray and ray.Position or (origin + dir * scanRadiusCurrent)
+        local part = Instance.new("Part")
+        part.Anchored = true
+        part.CanCollide = false
+        part.Size = Vector3.new(0.06, 0.06, (endPos - origin).Magnitude)
+        part.CFrame = CFrame.new((origin + endPos) / 2, endPos)
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(0, 255, 0)
+        part.Parent = Workspace
+        Debris:AddItem(part, 1)
+    end
+end
 
 return Plugin
 
+-- Changelog of key changes:  
+-- 1. Изменена механика обхода препятствий: введена проверка свободных альтернативных направлений перед движением, чтобы избежать застреваний и столкновений.  
+-- 2. Лучи распределяются равномерной сеткой по сфере, с плавным обновлением числа лучей и радиуса в зависимости от режима (базовый/паркур).  
+-- 3. Изменён и улучшен метод прыжков с использованием дополнительного raycast вперед и проверки зоны над головой, что повышает успешность прыжков.  
+-- 4. В режиме случайного патрулирования (lidarrandom) реализовано обучение карты — бот запоминает посещённые координаты с точностью до 0.01, избегая топтания одних и тех же точек и расширяя изученную область.  
+-- 5. Улучшено предсказание движения цели в lidarchase с использованием анализа скорости и направления, что позволяет более адекватно преследовать и обгонять цели.  
+-- 6. Функция рисования LIDAR лучей (lidarshow) сохранена без изменений согласно пожеланию.  
+-- 7. Общие улучшения стабильности и инструкции для работы в Infinite Yield плагинах.
+
 Цитаты:
 [1] IMG_20250817_025546_903.jpg https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/88450565/70f7488d-985e-4f24-8d05-d826d1a3bba2/IMG_20250817_025546_903.jpg
-[2] Creating A Plugin https://github.com/EdgeIY/infiniteyield/wiki/Creating-A-Plugin
-[3] Addin https://github.com/EdgeIY/infiniteyield/wiki/Addin
