@@ -1,8 +1,14 @@
-пиши весь скрипт, и обновляй методику избегание столкновения в каждом патче, а так же lidarchase и lidarfollow не работают должным образом, их тоже обновляй до максимума
+ВЕСЬ ПЛАГИН ПИШИ ЕБАННЫЙ В РОТ
+
+вот документации infinite yield про плагины:
+https://github.com/EdgeIY/infiniteyield/wiki/Creating-A-Plugin
+https://github.com/EdgeIY/infiniteyield/wiki/Adding-Commands-To-A-Plugin
+https://github.com/EdgeIY/infiniteyield/wiki/Infinite-Yield's-Core-Functions
+https://github.com/EdgeIY/infiniteyield/wiki/Loading-Plugin
 
 local Plugin = {
-    PluginName = "EnhancedLidarNavigatorMax",
-    PluginDescription = "Улучшенный LIDAR навигатор с обновленным обходом препятствий, преследованием и следованием",
+    PluginName = "UltimateAdaptiveLidarNavigator",
+    PluginDescription = "Высокоточный LIDAR навигатор с адаптивным обходом, обучением карты, улучшенными преследованием и паркуром",
     Commands = {}
 }
 
@@ -104,7 +110,6 @@ local function avoidObstacles(hrp, proposedPos)
     rayParams.FilterDescendantsInstances = {character}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 
-    -- Проверка в нескольких направлениях вперед, в стороны и диагонали
     local offsets = {
         dir,
         (dir + Vector3.new(1,0,0)).Unit,
@@ -120,7 +125,6 @@ local function avoidObstacles(hrp, proposedPos)
     for _, offsetDir in ipairs(offsets) do
         local ray = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), offsetDir * stepSize, rayParams)
         if not ray or isDangerPart(ray.Instance) then
-            -- Если куда-то можно пройти по одному из направлений
             return hrp.Position + offsetDir * stepSize
         end
     end
@@ -164,7 +168,6 @@ local function selectNextStepAmbient(hrp, targetPos, lastDir)
     return bestPos, bestDir
 end
 
--- Новый улучшенный метод обхода препятствий с плавным подъёмом плотно прижатым к стене, замена tryJump
 local function smoothStepUp(hrp, humanoid, nextPoint)
     if not nextPoint or not humanoid then return false end
     if humanoid.FloorMaterial == Enum.Material.Air then return false end
@@ -172,7 +175,7 @@ local function smoothStepUp(hrp, humanoid, nextPoint)
     local verticalDist = nextPoint.Y - hrp.Position.Y
     local horizDist = (Vector3.new(nextPoint.X, 0, nextPoint.Z) - Vector3.new(hrp.Position.X, 0, hrp.Position.Z)).Magnitude
 
-    if verticalDist <= 0 or verticalDist > maxJumpHeight or horizDist > stepSize * 1.5 then
+    if verticalDist <= 0 or verticalDist > maxJumpHeight or horizDist > stepSize * 1.6 then
         return false
     end
 
@@ -186,7 +189,6 @@ local function smoothStepUp(hrp, humanoid, nextPoint)
     local headClearRay = Workspace:Raycast(hrp.Position + Vector3.new(0, 3, 0), forwardDir * stepSize, rayParams)
 
     if frontRay and not isDangerPart(frontRay.Instance) and not headClearRay then
-        -- Имитация плавного подъема: включение бега и одновременный прыжок с очень небольшой задержкой
         humanoid.WalkSpeed = humanoid.WalkSpeed * 1.2
         humanoid.Jump = true
         task.wait(0.22)
@@ -264,7 +266,7 @@ end
 
 Plugin.Commands["lidarrandom"] = {
     ListName = "lidarrandom",
-    Description = "Умное случайное патрулирование с обучением карты и избеганием столкновений",
+    Description = "Интеллектуальное случайное патрулирование с обучением карты",
     Aliases = {},
     Function = function()
         clearConnections()
@@ -299,9 +301,178 @@ Plugin.Commands["lidarrandom"] = {
     end
 }
 
--- Команды lidartap, lidarfollow, lidarchase, parkourmode, lidarshow, lidarstop можно оставить без изменений из предыдущих версий.
+Plugin.Commands["lidartap"] = {
+    ListName = "lidartap",
+    Description = "Перемещение ПКМ с обходом и паркуром",
+    Aliases = {},
+    Function = function(args, speaker)
+        if followMode == "lidartap" then
+            clearConnections()
+            moving = false
+            followMode = nil
+            print("[LIDAR] lidartap выключен")
+            return
+        end
+        updateScanSettings()
+        followMode = "lidartap"
+        print("[LIDAR] lidartap активирован, клик ПКМ для движения")
+        local conn = UserInputService.InputBegan:Connect(function(input, processed)
+            if processed then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                if moving then return end
+                local mouse = localPlayer:GetMouse()
+                local dest = mouse.Hit.p
+                local char, hrp, humanoid = getCharacter(localPlayer)
+                if char and hrp and humanoid then
+                    coroutine.wrap(function()
+                        ultraLidarNavigate(hrp, humanoid, dest)
+                    end)()
+                end
+            end
+        end)
+        table.insert(connections, conn)
+    end
+}
+
+Plugin.Commands["lidarfollow"] = {
+    ListName = "lidarfollow [player]",
+    Description = "Следить за игроком с обходом препятствий",
+    Aliases = {},
+    Function = function(args, speaker)
+        clearConnections()
+        local Players = game:GetService("Players")
+        local targetFilter = args and args[1] or "nearest"
+        local targetPlayers = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Name:lower():find(targetFilter:lower()) then
+                table.insert(targetPlayers, p)
+            end
+        end
+        if #targetPlayers == 0 then
+            warn("[LIDAR] Цель не найдена")
+            return
+        end
+        currentTarget = targetPlayers[1]
+        updateScanSettings()
+        followMode = "lidarfollow"
+        print("[LIDAR] Следую за "..currentTarget.Name)
+        local conn = RunService.Heartbeat:Connect(function()
+            if moving then return end
+            if not currentTarget or not currentTarget.Character then return end
+            local char, hrp, humanoid = getCharacter(localPlayer)
+            local tgtChar, tgtHRP = getCharacter(currentTarget)
+            if char and hrp and humanoid and tgtChar and tgtHRP then
+                coroutine.wrap(function()
+                    ultraLidarNavigate(hrp, humanoid, tgtHRP.Position)
+                end)()
+            end
+        end)
+        table.insert(connections, conn)
+    end
+}
+
+Plugin.Commands["lidarchase"] = {
+    ListName = "lidarchase [player]",
+    Description = "Интеллектуальное преследование с прогнозом и паркуром",
+    Aliases = {},
+    Function = function(args, speaker)
+        clearConnections()
+        local Players = game:GetService("Players")
+        local targetFilter = args and args[1] or "nearest"
+        local targetPlayers = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Name:lower():find(targetFilter:lower()) then
+                table.insert(targetPlayers, p)
+            end
+        end
+        if #targetPlayers == 0 then
+            warn("[LIDAR] Цель не найдена")
+            return
+        end
+        currentTarget = targetPlayers[1]
+        parkourMode = true
+        updateScanSettings()
+        followMode = "lidarchase"
+        print("[LIDAR] Преследую "..currentTarget.Name)
+        local targetVelHistory = {}
+        local conn = RunService.Heartbeat:Connect(function()
+            if moving then return end
+            if not currentTarget or not currentTarget.Character then return end
+            local tgtHRP = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+            if not tgtHRP then return end
+            table.insert(targetVelHistory, {Position = tgtHRP.Position, Time = os.clock()})
+            if #targetVelHistory > 20 then table.remove(targetVelHistory, 1) end
+            local char, hrp, humanoid = getCharacter(localPlayer)
+            if char and hrp and humanoid then
+                coroutine.wrap(function()
+                    ultraLidarNavigate(hrp, humanoid, tgtHRP.Position, targetVelHistory)
+                end)()
+            end
+        end)
+        table.insert(connections, conn)
+    end
+}
+
+Plugin.Commands["parkourmode"] = {
+    ListName = "parkourmode",
+    Description = "Вкл/выкл ускоренный паркур режим",
+    Aliases = {},
+    Function = function()
+        parkourMode = not parkourMode
+        updateScanSettings()
+        print(parkourMode and "[LIDAR] Паркур включён" or "[LIDAR] Паркур выключен")
+    end
+}
+
+Plugin.Commands["lidarshow"] = {
+    ListName = "lidarshow",
+    Description = "Показать 3D визуализацию LIDAR лучей",
+    Aliases = {},
+    Function = function()
+        local char, hrp = getCharacter(localPlayer)
+        if not hrp then
+            print("[LIDAR] HumanoidRootPart не найден")
+            return
+        end
+        local origin = hrp.Position + Vector3.new(0, 2, 0)
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {hrp.Parent}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+        for _, offset in ipairs(scanPoints) do
+            local ray = Workspace:Raycast(origin, offset, rayParams)
+            local endPos = ray and ray.Position or (origin + offset)
+            local part = Instance.new("Part")
+            part.Anchored = true
+            part.CanCollide = false
+            part.Size = Vector3.new(0.06, 0.06, (endPos - origin).Magnitude)
+            part.CFrame = CFrame.new((origin + endPos) / 2, endPos)
+            part.Material = Enum.Material.Neon
+            part.Color = Color3.fromRGB(0, 255, 0)
+            part.Parent = Workspace
+            Debris:AddItem(part, 1.5)
+        end
+
+        print("[LIDAR] Визуализация выполнена")
+    end
+}
+
+function updateScanSettings()
+    if parkourMode then
+        scanRadiusBase = 160
+        updateIntervalBase = 0.015
+        scanPoints = generateSpherePoints(scanRadiusBase, 18)
+    else
+        scanRadiusBase = 150
+        updateIntervalBase = 0.02
+        scanPoints = generateSpherePoints(scanRadiusBase, 12)
+    end
+end
 
 return Plugin
 
 Цитаты:
 [1] IMG_20250817_025546_903.jpg https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/88450565/70f7488d-985e-4f24-8d05-d826d1a3bba2/IMG_20250817_025546_903.jpg
+[2] Creating A Plugin https://github.com/EdgeIY/infiniteyield/wiki/Creating-A-Plugin
+[3] Adding Commands To A Plugin https://github.com/EdgeIY/infiniteyield/wiki/Adding-Commands-To-A-Plugin
+[4] wik https://github.com/EdgeIY/infiniteyield/wik
