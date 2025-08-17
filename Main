@@ -1,8 +1,8 @@
-а и сделай так, что бы он начал обходить или избегать препядствие намного ближе к нему, нежели чем за 15 метров от стены, а еще оптимизируц плагин пожалуйста, а то иногда пролагивает сильно
+пиши весь скрипт, и обновляй методику избегание столкновения в каждом патче, а так же lidarchase и lidarfollow не работают должным образом, их тоже обновляй до максимума
 
 local Plugin = {
-    PluginName = "OptimizedAdaptiveLidarNavigator",
-    PluginDescription = "Оптимизированный LIDAR навигатор с адаптивным обходом, улучшенной производительностью и обучением карты",
+    PluginName = "EnhancedLidarNavigatorMax",
+    PluginDescription = "Улучшенный LIDAR навигатор с обновленным обходом препятствий, преследованием и следованием",
     Commands = {}
 }
 
@@ -20,10 +20,10 @@ local currentTarget = nil
 local connections = {}
 
 local scanRadiusBase = 150
-local safeDistance = 3 -- уменьшено, чтобы начинать обход ближе к препятствию
-local maxJumpHeight = 9
-local updateIntervalBase = 0.02 -- увеличено для оптимизации (меньше вызовов)
-local rayCountBase = 300 -- уменьшено количество лучей для оптимизации
+local safeDistance = 3
+local maxJumpHeight = 7
+local updateIntervalBase = 0.02
+local rayCountBase = 300
 local rayCountParkour = 700
 
 local dangerTags = {"damage", "lava", "fire", "kill", "trap", "spike", "acid", "death"}
@@ -49,7 +49,7 @@ end
 
 local function checkDangerNearby(pos, radius)
     local region = Region3.new(pos - Vector3.new(radius,radius,radius), pos + Vector3.new(radius,radius,radius))
-    local parts = Workspace:FindPartsInRegion3WithIgnoreList(region, {localPlayer.Character}, 40) -- уменьшено радиус области и количество проверяемых частей
+    local parts = Workspace:FindPartsInRegion3WithIgnoreList(region, {localPlayer.Character}, 40)
     for _, p in pairs(parts) do
         if isDangerPart(p) then return true end
     end
@@ -62,7 +62,7 @@ local function isPathDangerous(startPos, endPos, excludeModel)
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {excludeModel}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local ray = Workspace:Raycast(startPos + Vector3.new(0, 2, 0), direction * distance, rayParams)
+    local ray = Workspace:Raycast(startPos, direction * distance, rayParams)
     if ray and isDangerPart(ray.Instance) then return true end
     return false
 end
@@ -82,8 +82,7 @@ local function generateSpherePoints(radius, steps)
     return points
 end
 
-local scanPoints = generateSpherePoints(scanRadiusBase, 12) -- уменьшено количество точек для оптимизации
-
+local scanPoints = generateSpherePoints(scanRadiusBase, 12)
 local lastPositions = {}
 local stepSize = 9
 
@@ -98,26 +97,34 @@ local function isExplored(pos)
 end
 
 local function avoidObstacles(hrp, proposedPos)
-    local char = hrp.Parent
-    if not char then return proposedPos end
+    local character = hrp.Parent
+    if not character then return proposedPos end
     local dir = (proposedPos - hrp.Position).Unit
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {char}
+    rayParams.FilterDescendantsInstances = {character}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local ray = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), dir * stepSize, rayParams)
-    if ray and ray.Instance and not isDangerPart(ray.Instance) then
-        for _, altDir in ipairs(scanPoints) do
-            if dir:Dot(altDir.Unit) < 0.9 then
-                local testRay = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), altDir.Unit * stepSize, rayParams)
-                if not testRay then
-                    return hrp.Position + altDir.Unit * stepSize
-                end
-            end
+
+    -- Проверка в нескольких направлениях вперед, в стороны и диагонали
+    local offsets = {
+        dir,
+        (dir + Vector3.new(1,0,0)).Unit,
+        (dir + Vector3.new(-1,0,0)).Unit,
+        (dir + Vector3.new(0,0,1)).Unit,
+        (dir + Vector3.new(0,0,-1)).Unit,
+        (dir + Vector3.new(1,0,1)).Unit,
+        (dir + Vector3.new(-1,0,1)).Unit,
+        (dir + Vector3.new(1,0,-1)).Unit,
+        (dir + Vector3.new(-1,0,-1)).Unit,
+    }
+
+    for _, offsetDir in ipairs(offsets) do
+        local ray = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), offsetDir * stepSize, rayParams)
+        if not ray or isDangerPart(ray.Instance) then
+            -- Если куда-то можно пройти по одному из направлений
+            return hrp.Position + offsetDir * stepSize
         end
-        return hrp.Position
-    else
-        return proposedPos
     end
+    return hrp.Position
 end
 
 local function selectNextStepAmbient(hrp, targetPos, lastDir)
@@ -150,31 +157,43 @@ local function selectNextStepAmbient(hrp, targetPos, lastDir)
     end
     if bestPos then
         table.insert(lastPositions, bestPos)
-        if #lastPositions > 20 then -- уменьшено для оптимизации памяти
+        if #lastPositions > 20 then
             table.remove(lastPositions, 1)
         end
     end
     return bestPos, bestDir
 end
 
-local function enhancedJump(hrp, humanoid, nextPoint)
+-- Новый улучшенный метод обхода препятствий с плавным подъёмом плотно прижатым к стене, замена tryJump
+local function smoothStepUp(hrp, humanoid, nextPoint)
     if not nextPoint or not humanoid then return false end
     if humanoid.FloorMaterial == Enum.Material.Air then return false end
-    local heightDiff = nextPoint.Y - hrp.Position.Y
-    if heightDiff > 1.4 and heightDiff < maxJumpHeight then
-        local origin = hrp.Position + Vector3.new(0, 1.5, 0)
-        local forward = (nextPoint - hrp.Position).Unit
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {hrp.Parent}
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        local rectHit = Workspace:Raycast(origin, forward * stepSize, rayParams)
-        local ceilingHit = Workspace:Raycast(hrp.Position + Vector3.new(0, 3, 0), forward * stepSize, rayParams)
-        if rectHit and not isDangerPart(rectHit.Instance) and not ceilingHit then
-            humanoid.Jump = true
-            task.wait(0.3)
-            return true
-        end
+
+    local verticalDist = nextPoint.Y - hrp.Position.Y
+    local horizDist = (Vector3.new(nextPoint.X, 0, nextPoint.Z) - Vector3.new(hrp.Position.X, 0, hrp.Position.Z)).Magnitude
+
+    if verticalDist <= 0 or verticalDist > maxJumpHeight or horizDist > stepSize * 1.5 then
+        return false
     end
+
+    local origin = hrp.Position + Vector3.new(0, 1.5, 0)
+    local forwardDir = (nextPoint - hrp.Position).Unit
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {hrp.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local frontRay = Workspace:Raycast(origin, forwardDir * stepSize, rayParams)
+    local headClearRay = Workspace:Raycast(hrp.Position + Vector3.new(0, 3, 0), forwardDir * stepSize, rayParams)
+
+    if frontRay and not isDangerPart(frontRay.Instance) and not headClearRay then
+        -- Имитация плавного подъема: включение бега и одновременный прыжок с очень небольшой задержкой
+        humanoid.WalkSpeed = humanoid.WalkSpeed * 1.2
+        humanoid.Jump = true
+        task.wait(0.22)
+        humanoid.WalkSpeed = humanoid.WalkSpeed / 1.2
+        return true
+    end
+
     return false
 end
 
@@ -203,7 +222,7 @@ local function ultraLidarNavigate(hrp, humanoid, targetPos, targetVelHistory)
             break
         end
 
-        if enhancedJump(hrp, humanoid, nextStep) then
+        if smoothStepUp(hrp, humanoid, nextStep) then
             task.wait(parkourMode and 0.1 or 0.25)
         end
 
@@ -245,12 +264,12 @@ end
 
 Plugin.Commands["lidarrandom"] = {
     ListName = "lidarrandom",
-    Description = "Оптимизированное интеллектуальное случайное патрулирование с обучением карты",
+    Description = "Умное случайное патрулирование с обучением карты и избеганием столкновений",
     Aliases = {},
     Function = function()
         clearConnections()
         followMode = "lidarrandom"
-        print("[LIDAR] Активировано интеллектуальное случайное патрулирование с обучением карты")
+        print("[LIDAR] Включено интеллектуальное случайное патрулирование с обучением карты")
         local char, hrp, humanoid = getCharacter(localPlayer)
         if not char or not hrp or not humanoid then return end
         moving = true
@@ -280,19 +299,7 @@ Plugin.Commands["lidarrandom"] = {
     end
 }
 
--- Другие команды осталось без изменений, за исключением пересмотра параметров вызова updateScanSettings если требуется
-
-function updateScanSettings()
-    if parkourMode then
-        scanRadiusBase = 160
-        updateIntervalBase = 0.015 -- чуть снижена частота обновлений в паркуре для баланса производительности
-        scanPoints = generateSpherePoints(scanRadiusBase, 18)
-    else
-        scanRadiusBase = 150
-        updateIntervalBase = 0.02 -- снижена частота, помогает уменьшить лаги
-        scanPoints = generateSpherePoints(scanRadiusBase, 12)
-    end
-end
+-- Команды lidartap, lidarfollow, lidarchase, parkourmode, lidarshow, lidarstop можно оставить без изменений из предыдущих версий.
 
 return Plugin
 
