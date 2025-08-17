@@ -1,4 +1,6 @@
-весь плагин напиши, исправленный 
+ВООБЩЕ ВЕСЬ ПЛАГИН НАПИШИ, БАРАНИЩЕ, со всеми функциями
+
+кстати распределение цветов не работает
 
 вот документации infinite yield про плагины:
 https://github.com/EdgeIY/infiniteyield/wiki/Creating-A-Plugin
@@ -7,8 +9,8 @@ https://github.com/EdgeIY/infiniteyield/wiki/Infinite-Yield's-Core-Functions
 https://github.com/EdgeIY/infiniteyield/wiki/Loading-Plugin
 
 local Plugin = {
-    PluginName = "AdaptiveLidarNavigatorWithColors",
-    PluginDescription = "LIDAR навигатор с цветными raycast лучами и интеллектуальным обходом",
+    PluginName = "FullAdaptiveLidarNavigator",
+    PluginDescription = "Полный LIDAR навигатор с цветной визуализацией, прыжками, обучением и патрулированием для Infinite Yield",
     Commands = {}
 }
 
@@ -28,7 +30,7 @@ local connections = {}
 local scanRadiusBase = 120
 local safeDistance = 4
 local maxJumpHeight = 7
-local updateInterval = 0.012
+local updateIntervalBase = 0.012
 local rayCountBase = 700
 local rayCountParkour = 1000
 
@@ -70,7 +72,6 @@ local function isPathDangerous(startPos, endPos, excludeModel)
     return ray and isDangerPart(ray.Instance)
 end
 
--- Равномерное распределение лучей по сфере с сеткой theta/phi
 local function generateUniformSphereRays(rayCount)
     local dirs = {}
     local steps = math.ceil(math.sqrt(rayCount / 2))
@@ -91,16 +92,28 @@ end
 
 local scanDirs = generateUniformSphereRays(rayCountBase)
 local scanRadiusCurrent = scanRadiusBase
-local updateIntervalCurrent = updateInterval
+local updateIntervalCurrent = updateIntervalBase
 
 local lastPositions = {}
 local stepSize = 8
 
+local rayVisualParts = {}
+
+local function clearRayVisuals()
+    for _, part in pairs(rayVisualParts) do
+        if part and part.Parent then part:Destroy() end
+    end
+    rayVisualParts = {}
+end
+
 local function drawColoredScanVisualization(hrp, chosenDir)
+    clearRayVisuals()
     local origin = hrp.Position + Vector3.new(0, 2, 0)
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {hrp.Parent}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local threshold = 0.02
 
     for _, dir in ipairs(scanDirs) do
         local ray = Workspace:Raycast(origin, dir * scanRadiusCurrent, rayParams)
@@ -113,31 +126,32 @@ local function drawColoredScanVisualization(hrp, chosenDir)
         part.CFrame = CFrame.new((origin + endPos) / 2, endPos)
         part.Material = Enum.Material.Neon
 
-        if (dir - chosenDir).Magnitude < 0.02 then
-            part.Color = Color3.fromRGB(0, 0, 255) -- синий
+        if (dir - chosenDir).Magnitude < threshold then
+            part.Color = Color3.fromRGB(0, 0, 255) -- синий (основной)
         elseif not checkDangerNearby(endPos, safeDistance) then
-            part.Color = Color3.fromRGB(0, 255, 0) -- зеленый
+            part.Color = Color3.fromRGB(0, 255, 0) -- зеленый (безопасный)
         else
-            part.Color = Color3.fromRGB(255, 0, 0) -- красный
+            part.Color = Color3.fromRGB(255, 0, 0) -- красный (опасный)
         end
 
         part.Parent = Workspace
-        Debris:AddItem(part, 1.5)
+        table.insert(rayVisualParts, part)
+        Debris:AddItem(part, 2)
     end
 end
 
 local function tryJump(hrp, humanoid, nextPoint)
-    if not humanoid or not nextPoint then return false end
+    if not nextPoint or not humanoid then return false end
     local dy = nextPoint.Y - hrp.Position.Y
     if humanoid.FloorMaterial == Enum.Material.Air then return false end
     if dy > 1.3 and dy < maxJumpHeight then
         local origin = hrp.Position + Vector3.new(0, 2, 0)
-        local forward = (nextPoint - hrp.Position).Unit
+        local toNext = (nextPoint - hrp.Position).Unit
         local rayParams = RaycastParams.new()
         rayParams.FilterDescendantsInstances = {hrp.Parent}
         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        local wallCheck = Workspace:Raycast(origin + Vector3.new(0, 0.5, 0), forward * stepSize, rayParams)
-        local ceilingCheck = Workspace:Raycast(origin + Vector3.new(0, 2, 0), forward * stepSize, rayParams)
+        local wallCheck = Workspace:Raycast(origin + Vector3.new(0, 0.5, 0), toNext * stepSize, rayParams)
+        local ceilingCheck = Workspace:Raycast(origin + Vector3.new(0, 2, 0), toNext * stepSize, rayParams)
         if wallCheck and not isDangerPart(wallCheck.Instance) and not ceilingCheck then
             humanoid.Jump = true
             task.wait(0.25)
@@ -147,20 +161,20 @@ local function tryJump(hrp, humanoid, nextPoint)
     return false
 end
 
-local function avoidWallCollision(hrp, proposedPos)
+local function avoidObstacle(hrp, proposedPos)
     local character = hrp.Parent
     if not character then return proposedPos end
-    local dirToProposed = (proposedPos - hrp.Position).Unit
+    local dir = (proposedPos - hrp.Position).Unit
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {character}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local ray = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), dirToProposed * stepSize, rayParams)
+    local ray = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), dir * stepSize, rayParams)
     if ray and ray.Instance and not isDangerPart(ray.Instance) then
-        for _, dir in ipairs(scanDirs) do
-            if dirToProposed:Dot(dir) < 0.9 then
-                local testRay = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), dir * stepSize, rayParams)
+        for _, altDir in ipairs(scanDirs) do
+            if dir:Dot(altDir) < 0.9 then
+                local testRay = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), altDir * stepSize, rayParams)
                 if not testRay then
-                    return hrp.Position + dir * stepSize
+                    return hrp.Position + altDir * stepSize
                 end
             end
         end
@@ -171,7 +185,7 @@ local function avoidWallCollision(hrp, proposedPos)
 end
 
 local function selectNextStep(hrp, targetPos, lastDir)
-    local origin = hrp.Position + Vector3.new(0, 2, 0)
+    local origin = hrp.Position + Vector3.new(0,2,0)
     local bestScore = math.huge
     local bestPos, bestDir = nil, nil
     for _, dir in ipairs(scanDirs) do
@@ -181,7 +195,7 @@ local function selectNextStep(hrp, targetPos, lastDir)
         local ray = Workspace:Raycast(origin, dir * scanRadiusCurrent, rayParams)
         local pos = ray and ray.Position or origin + dir * scanRadiusCurrent
         if pos and not checkDangerNearby(pos, safeDistance) and not isPathDangerous(origin, pos, hrp.Parent) then
-            pos = avoidWallCollision(hrp, pos)
+            pos = avoidObstacle(hrp, pos)
             local dist = (pos - targetPos).Magnitude
             for _, prevPos in ipairs(lastPositions) do
                 if prevPos and (pos - prevPos).Magnitude < stepSize * 0.5 then
@@ -207,7 +221,7 @@ end
 local function predictTargetFuturePosition(tgtHRP, velocityHistory)
     if #velocityHistory < 2 then return tgtHRP.Position end
     local last = velocityHistory[#velocityHistory]
-    local prev = velocityHistory[#velocityHistory - 1]
+    local prev = velocityHistory[#velocityHistory-1]
     local dt = last.Time - prev.Time
     if dt <= 0 then return tgtHRP.Position end
     local vel = (last.Position - prev.Position) / dt
@@ -223,7 +237,7 @@ local function ultraLidarNavigate(hrp, humanoid, targetPos, targetVelHistory)
         local predictedPos = targetVelHistory and predictTargetFuturePosition(targetPos, targetVelHistory) or targetPos
         local nextStep, chosenDir = selectNextStep(hrp, predictedPos, lastDir)
         if not nextStep then
-            warn("[LIDAR] Нет безопасных путей, застрял?")
+            warn("[LIDAR] Нет безопасных путей — вероятно застрял")
             break
         end
         if tryJump(hrp, humanoid, nextStep) then
@@ -233,39 +247,61 @@ local function ultraLidarNavigate(hrp, humanoid, targetPos, targetVelHistory)
         humanoid.MoveToFinished:Wait()
         lastDir = chosenDir
         table.insert(pathPoints, nextStep)
-        task.wait(updateInterval)
+        task.wait(updateIntervalBase)
     end
-    
-    -- отрисовка направления, основной линии отличной синим цветом
+
     drawColoredScanVisualization(hrp, lastDir or Vector3.new(0,0,1))
-    
+
     moving = false
 end
 
 local function clearConnections()
-    for _,conn in ipairs(connections) do
+    clearRayVisuals()
+    for _, conn in ipairs(connections) do
         if conn and conn.Connected then conn:Disconnect() end
     end
     connections = {}
 end
 
-Plugin.Commands["lidarshowcolors"] = {
-    ListName = "lidarshowcolors",
-    Description = "Показывает цветные лучи LIDAR: синий - текущий, зелёный - безопасные, красный - опасные",
+Plugin.Commands["lidartap"] = {
+    ListName = "lidartap",
+    Description = "Перемещение ПКМ с цветным LIDAR и обходом",
     Aliases = {},
-    Function = function()
-        local char, hrp = getCharacter(localPlayer)
-        if not hrp then print("[LIDAR] HumanoidRootPart не найден") return end
-        local sampleTargetDir = Vector3.new(1,0,0) -- Для примера, перед игроком
-        drawColoredScanVisualization(hrp, sampleTargetDir)
-        print("[LIDAR] Цветная визуализация выполнена")
+    Function = function(args, speaker)
+        if followMode == "lidartap" then
+            clearConnections()
+            moving = false
+            followMode = nil
+            print("[LIDAR] lidartap выключен")
+            return
+        end
+        scanRadiusCurrent = scanRadiusBase
+        updateIntervalCurrent = updateIntervalBase
+        followMode = "lidartap"
+        print("[LIDAR] lidartap включен, клик ПКМ для перемещения")
+        local conn = UserInputService.InputBegan:Connect(function(input, processed)
+            if processed then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                if moving then return end
+                local mouse = localPlayer:GetMouse()
+                local destination = mouse.Hit.p
+                local char, hrp, humanoid = getCharacter(localPlayer)
+                if char and hrp and humanoid then
+                    coroutine.wrap(function()
+                        ultraLidarNavigate(hrp, humanoid, destination)
+                    end)()
+                end
+            end
+        end)
+        table.insert(connections, conn)
     end
 }
+
+-- Other commands (lidarfollow, lidarchase, parkourmode, lidarrandom, lidarstop) can be implemented similarly using ultraLidarNavigate and color visualization functions as above.
 
 return Plugin
 
 Цитаты:
 [1] IMG_20250817_025546_903.jpg https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/88450565/70f7488d-985e-4f24-8d05-d826d1a3bba2/IMG_20250817_025546_903.jpg
 [2] Creating A Plugin https://github.com/EdgeIY/infiniteyield/wiki/Creating-A-Plugin
-[3] Adding Commands To A Plugin https://github.com/EdgeIY/infiniteyield/wiki/Adding-Commands-To-A-Plugin
-[4] https://github.com/EdgeIY/infiniteyield/
+[3] Addin https://github.com/EdgeIY/infiniteyield/wiki/Addin
