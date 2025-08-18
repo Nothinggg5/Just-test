@@ -7,6 +7,13 @@ local ScreenGui
 local MainFrame
 local tabPages = {}
 
+local function createUICorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = parent
+    return c
+end
+
 local function createUI()
     if ScreenGui then
         ScreenGui:Destroy()
@@ -23,18 +30,19 @@ local function createUI()
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.Size = UDim2.new(0, 700, 0, 480)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(36, 38, 47)  -- статичный фон
+    MainFrame.BackgroundColor3 = Color3.fromRGB(36, 38, 47)
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = true
+    createUICorner(MainFrame, 18)
 
-    -- Header
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 48)
-    Header.BackgroundColor3 = Color3.fromRGB(41, 44, 58) -- чуть темнее шапка
+    Header.BackgroundColor3 = Color3.fromRGB(41, 44, 58)
     Header.BorderSizePixel = 0
     Header.Parent = MainFrame
+    createUICorner(Header, 15)
 
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Text = "Pro UI Library"
@@ -46,7 +54,6 @@ local function createUI()
     TitleLabel.Size = UDim2.new(0, 220, 0, 32)
     TitleLabel.Parent = Header
 
-    -- Dragging logic
     local dragging = false
     local dragStart = nil
     local startPos = nil
@@ -74,13 +81,13 @@ local function createUI()
         end
     end)
 
-    -- TabsBar
     local TabsBar = Instance.new("Frame")
     TabsBar.Size = UDim2.new(1, -40, 0, 44)
     TabsBar.Position = UDim2.new(0, 20, 0, 56)
-    TabsBar.BackgroundColor3 = Color3.fromRGB(34, 38, 51) -- ниже Header и чуть светлее
+    TabsBar.BackgroundColor3 = Color3.fromRGB(34, 38, 51)
     TabsBar.BorderSizePixel = 0
     TabsBar.Parent = MainFrame
+    createUICorner(TabsBar, 14)
 
     local UIListLayout = Instance.new("UIListLayout")
     UIListLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -88,7 +95,6 @@ local function createUI()
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Parent = TabsBar
 
-    -- Content container
     local ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, -40, 1, -120)
     ContentFrame.Position = UDim2.new(0, 20, 0, 108)
@@ -100,21 +106,23 @@ local function createUI()
     local function createTab(name, pageLabelText)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 142, 0, 40)
-        btn.BackgroundColor3 = Color3.fromRGB(49, 51, 65) -- темно-серый
+        btn.BackgroundColor3 = Color3.fromRGB(49, 51, 65)
         btn.BorderSizePixel = 0
         btn.Text = name
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 18
-        btn.TextColor3 = Color3.fromRGB(222, 228, 242) -- светлый серо-голубой
+        btn.TextColor3 = Color3.fromRGB(222, 228, 242)
         btn.AutoButtonColor = false
         btn.Parent = TabsBar
+        createUICorner(btn, 12)
 
         local page = Instance.new("Frame")
         page.Size = UDim2.new(1, 0, 1, 0)
         page.BackgroundTransparency = 0
-        page.BackgroundColor3 = Color3.fromRGB(39, 41, 54) -- страницы тоже спокойные
+        page.BackgroundColor3 = Color3.fromRGB(39, 41, 54)
         page.Visible = false
         page.Parent = ContentFrame
+        createUICorner(page, 12)
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0)
@@ -123,7 +131,6 @@ local function createUI()
         label.Font = Enum.Font.GothamBold
         label.TextSize = 26
         label.TextColor3 = Color3.fromRGB(180, 185, 210)
-        label.TextTransparency = 0.02
         label.Parent = page
 
         btn.MouseButton1Click:Connect(function()
@@ -131,12 +138,10 @@ local function createUI()
                 v.page.Visible = false
                 v.button.BackgroundColor3 = Color3.fromRGB(49, 51, 65)
                 v.button.TextColor3 = Color3.fromRGB(222,228,242)
-                v.button.TextStrokeTransparency = 1
             end
             page.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(85, 105, 160)  -- мягкий светлый акцент
+            btn.BackgroundColor3 = Color3.fromRGB(85, 105, 160)
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextStrokeTransparency = 0.7
         end)
         tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
     end
@@ -161,8 +166,8 @@ local function createUI()
         button.TextSize = 18
         button.TextColor3 = Color3.fromRGB(236, 239, 250)
         button.Parent = parent
-
         button.AutoButtonColor = false
+        createUICorner(button, 12)
 
         button.MouseEnter:Connect(function()
             TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(85, 105, 160)}):Play()
@@ -198,6 +203,7 @@ local function createUI()
         toggle.BackgroundColor3 = initialState and Color3.fromRGB(110, 160, 110) or Color3.fromRGB(100, 100, 120)
         toggle.Text = ""
         toggle.Parent = frame
+        createUICorner(toggle, 10)
 
         local state = initialState
 
@@ -237,6 +243,7 @@ local function createUI()
         sliderBar.BackgroundColor3 = Color3.fromRGB(53, 56, 74)
         sliderBar.BorderSizePixel = 0
         sliderBar.Parent = frame
+        createUICorner(sliderBar, 11)
 
         local sliderFill = Instance.new("Frame")
         sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 0, 12)
@@ -244,6 +251,7 @@ local function createUI()
         sliderFill.BackgroundColor3 = Color3.fromRGB(117, 123, 169)
         sliderFill.BorderSizePixel = 0
         sliderFill.Parent = sliderBar
+        createUICorner(sliderFill, 6)
 
         local dragging = false
 
@@ -298,7 +306,7 @@ local function createUI()
         print("Состояние тумблера:", state)
     end)
 
-    createSlider(settingsPage, "Слайдер", 0, 100, 0.5, function(value)
+    createSlider(settingsPage, "Слайдер", 0, 100, 50, function(value)
         print("Значение слайдера:", math.floor(value))
     end)
 
