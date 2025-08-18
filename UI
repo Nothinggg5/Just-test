@@ -123,7 +123,7 @@ local function createToggle(parent, text, initialState, callback)
     label.Text = text
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.TextColor3 = Color3.fromRGB(140, 140, 140) -- более приглушённый серый
     label.Font = Enum.Font.GothamBold
     label.TextSize = 18
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -132,14 +132,14 @@ local function createToggle(parent, text, initialState, callback)
     local toggle = Instance.new("TextButton")
     toggle.Size = UDim2.new(0, 40, 0, 24)
     toggle.Position = UDim2.new(0.75, 0, 0.2, 0)
-    toggle.BackgroundColor3 = initialState and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(100, 100, 100)
+    toggle.BackgroundColor3 = initialState and Color3.fromRGB(100, 160, 100) or Color3.fromRGB(140, 140, 140)
     toggle.Text = ""
     toggle.Parent = frame
     toggle.Active = true
 
-    local disabledColor = Color3.fromRGB(100, 100, 100)
-    local hoverColorActive = Color3.fromRGB(140, 230, 140)
-    local hoverColorInactive = Color3.fromRGB(160, 130, 130)
+    local disabledColor = Color3.fromRGB(140, 140, 140)
+    local hoverColorActive = Color3.fromRGB(120, 190, 120)
+    local hoverColorInactive = Color3.fromRGB(170, 170, 170)
 
     local state = initialState
 
@@ -153,13 +153,13 @@ local function createToggle(parent, text, initialState, callback)
 
     toggle.MouseLeave:Connect(function()
         TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-            BackgroundColor3 = state and Color3.fromRGB(100, 200, 100) or disabledColor
+            BackgroundColor3 = state and Color3.fromRGB(100, 160, 100) or disabledColor
         }):Play()
     end)
 
     toggle.MouseButton1Click:Connect(function()
         state = not state
-        local newColor = state and Color3.fromRGB(100, 200, 100) or disabledColor
+        local newColor = state and Color3.fromRGB(100, 160, 100) or disabledColor
         TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = newColor}):Play()
         if callback then
             callback(state)
@@ -283,7 +283,6 @@ local function createTab(name, pageLabelText)
     buttonGradient.Rotation = 90
     buttonGradient.Parent = btn
 
-    -- ScrollingFrame для вкладки
     local page = Instance.new("ScrollingFrame")
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
@@ -483,6 +482,91 @@ local function createUI()
     configBoxCorner.CornerRadius = UDim.new(0, 12)
     configBoxCorner.Parent = configNameBox
     configNameBox.LayoutOrder = 2
+    
+    -- Dropdown Button
+    local dropdownBtn = Instance.new("TextButton")
+    dropdownBtn.Size = UDim2.new(0, 36, 0, 36)
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
+    dropdownBtn.Text = "▼"
+    dropdownBtn.Font = Enum.Font.GothamBold
+    dropdownBtn.TextSize = 18
+    dropdownBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+    dropdownBtn.Parent = settingsPage
+    dropdownBtn.LayoutOrder = 3
+
+    local dropdownMenu = Instance.new("Frame")
+    dropdownMenu.Size = UDim2.new(0, 260, 0, 150)
+    dropdownMenu.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
+    dropdownMenu.BorderSizePixel = 0
+    dropdownMenu.Visible = false
+    dropdownMenu.Parent = settingsPage
+    dropdownMenu.LayoutOrder = 4
+
+    local uiLayout = Instance.new("UIListLayout")
+    uiLayout.Parent = dropdownMenu
+    uiLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiLayout.Padding = UDim.new(0, 4)
+
+    local function updateDropdownConfigs()
+        for i, child in pairs(dropdownMenu:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        local newBtn = Instance.new("TextButton")
+        newBtn.Size = UDim2.new(1, -12, 0, 30)
+        newBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
+        newBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+        newBtn.Font = Enum.Font.GothamBold
+        newBtn.TextSize = 18
+        newBtn.Text = "Создать новый конфиг"
+        newBtn.Parent = dropdownMenu
+        newBtn.LayoutOrder = 1
+
+        newBtn.MouseButton1Click:Connect(function()
+            configNameBox.Text = ""
+            dropdownMenu.Visible = false
+        end)
+
+        local success, list = pcall(function()
+            return listfiles(ROOT_FOLDER)
+        end)
+
+        if success and list then
+            local order = 2
+            for _, filePath in pairs(list) do
+                if filePath:sub(-5) == ".json" then
+                    local fileName = filePath:match("([^\\/]+)$")
+                    fileName = fileName:gsub("%.json$", "")
+                    local btn = Instance.new("TextButton")
+                    btn.Size = UDim2.new(1, -12, 0, 30)
+                    btn.BackgroundColor3 = Color3.fromRGB(70, 40, 110)
+                    btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+                    btn.Font = Enum.Font.GothamBold
+                    btn.TextSize = 18
+                    btn.Text = fileName
+                    btn.Parent = dropdownMenu
+                    btn.LayoutOrder = order
+                    order = order + 1
+
+                    btn.MouseButton1Click:Connect(function()
+                        configNameBox.Text = fileName
+                        dropdownMenu.Visible = false
+                    end)
+                end
+            end
+        else
+            print("Не удалось получить список файлов конфигов из папки "..ROOT_FOLDER)
+        end
+    end
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        dropdownMenu.Visible = not dropdownMenu.Visible
+        if dropdownMenu.Visible then
+            updateDropdownConfigs()
+        end
+    end)
 
     createButton(settingsPage, "Сохранить конфиг", function()
         local name = configNameBox.Text
@@ -497,7 +581,7 @@ local function createUI()
         local savePath = ROOT_FOLDER.."/"..name..".json"
         saveConfig(savePath, dataToSave)
         print("Конфиг сохранен под именем: "..name)
-    end).LayoutOrder = 3
+    end).LayoutOrder = 5
 
     createButton(settingsPage, "Загрузить конфиг", function()
         local name = configNameBox.Text
@@ -511,28 +595,27 @@ local function createUI()
             themeConfig = data.Theme or defaultThemeConfig
             scriptConfig = data.Script or defaultScriptConfig
             print("Конфиг загружен: "..name)
-            -- Возможное обновление GUI при загрузке можно добавить здесь
         else
             print("Конфиг с именем '"..name.."' не найден.")
         end
-    end).LayoutOrder = 4
+    end).LayoutOrder = 6
 
     createButton(settingsPage, "Нажми меня", function()
         print("Кнопка нажата!")
-    end).LayoutOrder = 5
+    end).LayoutOrder = 7
 
     local toggleFrame, getToggleState = createToggle(settingsPage, "Тумблер", false, function(state)
         print("Состояние тумблера:", state)
     end)
-    toggleFrame.LayoutOrder = 6
+    toggleFrame.LayoutOrder = 8
 
     createSlider(settingsPage, "Слайдер", 0, 100, 0.5, function(value)
         print("Значение слайдера:", math.floor(value))
-    end).LayoutOrder = 7
+    end).LayoutOrder = 9
 
     createButton(settingsPage, "Выключить GUI", function()
         ScreenGui:Destroy()
-    end).LayoutOrder = 8
+    end).LayoutOrder = 10
 end
 
 createUI()
