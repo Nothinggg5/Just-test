@@ -29,7 +29,7 @@ end
 
 local defaultThemeConfig = {
     Background = {R=18, G=18, B=28},
-    Accent = {R=153, G=51, B=255},
+    Accent = {R=153, G=51, 255},
     Text = {R=210, G=210, B=240},
 }
 
@@ -483,7 +483,16 @@ local function createUI()
     configBoxCorner.Parent = configNameBox
     configNameBox.LayoutOrder = 2
 
-    -- Dropdown Button
+    -- Dropdown container для правильного отображения
+    local dropdownContainer = Instance.new("Frame")
+    dropdownContainer.Name = "DropdownContainer"
+    dropdownContainer.Size = UDim2.new(1, 0, 1, 0)
+    dropdownContainer.BackgroundTransparency = 1
+    dropdownContainer.ZIndex = 99
+    dropdownContainer.Active = true
+    dropdownContainer.Parent = ScreenGui
+
+    -- Кнопка-стрелка для открытия меню
     local dropdownBtn = Instance.new("TextButton")
     dropdownBtn.Size = UDim2.new(0, 36, 0, 36)
     dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
@@ -494,16 +503,16 @@ local function createUI()
     dropdownBtn.Parent = settingsPage
     dropdownBtn.LayoutOrder = 3
 
+    -- Само меню конфигов
     local dropdownMenu = Instance.new("Frame")
     dropdownMenu.Size = UDim2.new(0, 260, 0, 150)
     dropdownMenu.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
     dropdownMenu.BorderSizePixel = 1
     dropdownMenu.BorderColor3 = Color3.fromRGB(153, 51, 255)
     dropdownMenu.Visible = false
-    dropdownMenu.ZIndex = 50
+    dropdownMenu.ZIndex = 100
     dropdownMenu.Active = true
-    dropdownMenu.Parent = settingsPage
-    dropdownMenu.LayoutOrder = 4
+    dropdownMenu.Parent = dropdownContainer
 
     local uiLayout = Instance.new("UIListLayout")
     uiLayout.Parent = dropdownMenu
@@ -549,10 +558,16 @@ local function createUI()
         end
     end
 
+    -- Обновляем позицию dropdownMenu перед открытием
     dropdownBtn.MouseButton1Click:Connect(function()
         dropdownMenu.Visible = not dropdownMenu.Visible
         if dropdownMenu.Visible then
             updateDropdownConfigs()
+            -- абсолютная позиция относительно Script GUI
+            local absPos = configNameBox.AbsolutePosition
+            local absSize = configNameBox.AbsoluteSize
+            -- позиционируем меню ниже поля ввода конфига
+            dropdownMenu.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 5)
         end
     end)
 
@@ -604,7 +619,7 @@ local function createUI()
         confirmFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
         confirmFrame.BorderSizePixel = 0
         confirmFrame.Parent = settingsPage
-        confirmFrame.ZIndex = 50
+        confirmFrame.ZIndex = 110
 
         local confirmText = Instance.new("TextLabel")
         confirmText.Size = UDim2.new(1, -20, 0, 60)
