@@ -22,60 +22,39 @@ local function createUI()
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    MainFrame.Size = UDim2.new(0, 0, 0, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(38, 38, 48) -- светлее фон
+    MainFrame.Size = UDim2.new(0, 700, 0, 480)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(36, 38, 47)  -- статичный фон
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = true
-    MainFrame.BackgroundTransparency = 1
 
-    local function fadeInUI(frame)
-        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(frame, tweenInfo, {
-            Size = UDim2.new(0, 700, 0, 480),
-            BackgroundTransparency = 0
-        })
-        tween:Play()
-    end
-    fadeInUI(MainFrame)
-
-    -- Header with soft gradient
+    -- Header
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 48)
-    Header.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    Header.BackgroundColor3 = Color3.fromRGB(41, 44, 58) -- чуть темнее шапка
     Header.BorderSizePixel = 0
     Header.Parent = MainFrame
-
-    local headerGradient = Instance.new("UIGradient")
-    headerGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(44,44,60)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(28,28,36))
-    }
-    headerGradient.Rotation = 90
-    headerGradient.Parent = Header
 
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Text = "Pro UI Library"
     TitleLabel.Font = Enum.Font.GothamBold
     TitleLabel.TextSize = 24
-    TitleLabel.TextColor3 = Color3.fromRGB(230, 230, 255)
+    TitleLabel.TextColor3 = Color3.fromRGB(210, 210, 222)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.Position = UDim2.new(0, 12, 0, 8)
-    TitleLabel.Size = UDim2.new(0, 200, 0, 32)
+    TitleLabel.Size = UDim2.new(0, 220, 0, 32)
     TitleLabel.Parent = Header
 
     -- Dragging logic
     local dragging = false
     local dragStart = nil
     local startPos = nil
-
     Header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
-
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -95,179 +74,105 @@ local function createUI()
         end
     end)
 
-    -- TabsBar with soft gradient
+    -- TabsBar
     local TabsBar = Instance.new("Frame")
-    TabsBar.Size = UDim2.new(1, -40, 0, 48)
-    TabsBar.Position = UDim2.new(0, 20, 0, 58)
-    TabsBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    TabsBar.Size = UDim2.new(1, -40, 0, 44)
+    TabsBar.Position = UDim2.new(0, 20, 0, 56)
+    TabsBar.BackgroundColor3 = Color3.fromRGB(34, 38, 51) -- ниже Header и чуть светлее
     TabsBar.BorderSizePixel = 0
     TabsBar.Parent = MainFrame
 
-    local tabsGradient = Instance.new("UIGradient")
-    tabsGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(55,48,65)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(38,33,48))
-    }
-    tabsGradient.Rotation = 90
-    tabsGradient.Parent = TabsBar
-
     local UIListLayout = Instance.new("UIListLayout")
     UIListLayout.FillDirection = Enum.FillDirection.Horizontal
-    UIListLayout.Padding = UDim.new(0, 20)
+    UIListLayout.Padding = UDim.new(0, 16)
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Parent = TabsBar
 
     -- Content container
     local ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, -40, 1, -120)
-    ContentFrame.Position = UDim2.new(0, 20, 0, 110)
+    ContentFrame.Position = UDim2.new(0, 20, 0, 108)
     ContentFrame.BackgroundTransparency = 1
     ContentFrame.Parent = MainFrame
 
     tabPages = {}
 
-    local function showLabelWithFade(label)
-        label.TextTransparency = 1
-        label.Visible = true
-        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(label, tweenInfo, {TextTransparency = 0})
-        tween:Play()
-    end
-
     local function createTab(name, pageLabelText)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 140, 0, 44)
-        btn.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
+        btn.Size = UDim2.new(0, 142, 0, 40)
+        btn.BackgroundColor3 = Color3.fromRGB(49, 51, 65) -- темно-серый
         btn.BorderSizePixel = 0
         btn.Text = name
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 18
-        btn.TextColor3 = Color3.fromRGB(230, 210, 240) -- чуть теплее и ярче для вкладок
+        btn.TextColor3 = Color3.fromRGB(222, 228, 242) -- светлый серо-голубой
+        btn.AutoButtonColor = false
         btn.Parent = TabsBar
-
-        local buttonGradient = Instance.new("UIGradient")
-        buttonGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 60, 120)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 35, 70))
-        }
-        buttonGradient.Rotation = 90
-        buttonGradient.Parent = btn
-
-        local btnTextStroke = Instance.new("UIStroke")
-        btnTextStroke.Color = Color3.fromRGB(60, 40, 90)
-        btnTextStroke.Thickness = 1
-        btnTextStroke.Transparency = 0.3
-        btnTextStroke.Parent = btn
 
         local page = Instance.new("Frame")
         page.Size = UDim2.new(1, 0, 1, 0)
-        page.BackgroundTransparency = 1
+        page.BackgroundTransparency = 0
+        page.BackgroundColor3 = Color3.fromRGB(39, 41, 54) -- страницы тоже спокойные
         page.Visible = false
         page.Parent = ContentFrame
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 0.4 -- чуть затемнил фон для читаемости
-        label.BackgroundColor3 = Color3.fromRGB(38, 30, 48)
+        label.BackgroundTransparency = 1
         label.Text = pageLabelText
         label.Font = Enum.Font.GothamBold
-        label.TextSize = 28
-        label.TextColor3 = Color3.fromRGB(130, 80, 150) -- приглушённый пурпурный
-        label.TextTransparency = 0
-        label.TextStrokeTransparency = 0.5 -- полупрозрачный текстовый контур
+        label.TextSize = 26
+        label.TextColor3 = Color3.fromRGB(180, 185, 210)
+        label.TextTransparency = 0.02
         label.Parent = page
-
-        local textStroke = Instance.new("UIStroke")
-        textStroke.Thickness = 1.5
-        textStroke.Color = Color3.new(0, 0, 0)
-        textStroke.Transparency = 0.7
-        textStroke.Parent = label
 
         btn.MouseButton1Click:Connect(function()
             for _, v in pairs(tabPages) do
-                if v.page.Visible then
-                    local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-                    tweenOut.Completed:Connect(function()
-                        v.page.Visible = false
-                    end)
-                    tweenOut:Play()
-                end
-                TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
+                v.page.Visible = false
+                v.button.BackgroundColor3 = Color3.fromRGB(49, 51, 65)
+                v.button.TextColor3 = Color3.fromRGB(222,228,242)
+                v.button.TextStrokeTransparency = 1
             end
             page.Visible = true
-            page.BackgroundTransparency = 0
-            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.4})
-            tweenIn:Play()
-            TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
-            showLabelWithFade(label)
+            btn.BackgroundColor3 = Color3.fromRGB(85, 105, 160)  -- мягкий светлый акцент
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextStrokeTransparency = 0.7
         end)
-
         tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
     end
 
     createTab("Main", "Главная страница")
-    createTab("Settings", "Настройки (будет дополнено)")
+    createTab("Settings", "Настройки")
     createTab("Credits", "Кредиты")
 
-    if tabPages[1] and tabPages[1].button and tabPages[1].label then
-        tabPages[1].page.Visible = true
-        tabPages[1].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
-        showLabelWithFade(tabPages[1].label)
-    else
-        warn("Ошибка: tabPages[1] не инициализированы")
+    if tabPages[1] then
+        tabPages.page.Visible = true
+        tabPages.button.BackgroundColor3 = Color3.fromRGB(85, 105, 160)
+        tabPages.button.TextColor3 = Color3.fromRGB(255,255,255)
     end
 
     local function createButton(parent, text, callback)
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(0, 160, 0, 40)
-        button.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
+        button.BackgroundColor3 = Color3.fromRGB(54, 60, 78)
         button.BorderSizePixel = 0
         button.Text = text
         button.Font = Enum.Font.GothamBold
         button.TextSize = 18
-        button.TextColor3 = Color3.fromRGB(240, 230, 255) -- ярче текста на кнопках
+        button.TextColor3 = Color3.fromRGB(236, 239, 250)
         button.Parent = parent
 
-        local buttonGradient = Instance.new("UIGradient")
-        buttonGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 60, 120)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 35, 70))
-        }
-        buttonGradient.Rotation = 90
-        buttonGradient.Parent = button
-
-        local buttonTextStroke = Instance.new("UIStroke")
-        buttonTextStroke.Color = Color3.fromRGB(50, 30, 90)
-        buttonTextStroke.Thickness = 1
-        buttonTextStroke.Transparency = 0.5
-        buttonTextStroke.Parent = button
-
-        local originalColor = button.BackgroundColor3
-        local hoverColor = Color3.fromRGB(120, 70, 180)
-        local clickColor = Color3.fromRGB(60, 40, 100)
+        button.AutoButtonColor = false
 
         button.MouseEnter:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
-            TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
-            TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 170, 0, 45)}):Play()
+            TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(85, 105, 160)}):Play()
+            TweenService:Create(button, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
         end)
-
         button.MouseLeave:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = originalColor}):Play()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(240,230,255)}):Play()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 160, 0, 40)}):Play()
+            TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(54, 60, 78)}):Play()
+            TweenService:Create(button, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(236,239,250)}):Play()
         end)
-
-        button.MouseButton1Down:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.11, Enum.EasingStyle.Quad), {BackgroundColor3 = clickColor}):Play()
-        end)
-
-        button.MouseButton1Up:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.13, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
-        end)
-
         button.MouseButton1Click:Connect(callback)
-
         return button
     end
 
@@ -281,7 +186,7 @@ local function createUI()
         label.Text = text
         label.Size = UDim2.new(0.7, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(240, 230, 255) -- ярче текста тумблера
+        label.TextColor3 = Color3.fromRGB(230, 232, 245)
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextXAlignment = Enum.TextXAlignment.Left
@@ -290,43 +195,24 @@ local function createUI()
         local toggle = Instance.new("TextButton")
         toggle.Size = UDim2.new(0, 40, 0, 24)
         toggle.Position = UDim2.new(0.75, 0, 0.2, 0)
-        toggle.BackgroundColor3 = initialState and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(100, 100, 100)
+        toggle.BackgroundColor3 = initialState and Color3.fromRGB(110, 160, 110) or Color3.fromRGB(100, 100, 120)
         toggle.Text = ""
         toggle.Parent = frame
-        toggle.Active = true
-
-        local disabledColor = Color3.fromRGB(100, 100, 100)
-        local hoverColorActive = Color3.fromRGB(140, 230, 140)
-        local hoverColorInactive = Color3.fromRGB(160, 130, 130)
 
         local state = initialState
 
         toggle.MouseEnter:Connect(function()
-            if state then
-                TweenService:Create(toggle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColorActive}):Play()
-            else
-                TweenService:Create(toggle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColorInactive}):Play()
-            end
+            TweenService:Create(toggle, TweenInfo.new(0.13), {BackgroundColor3 = Color3.fromRGB(120, 170, 140)}):Play()
         end)
-
         toggle.MouseLeave:Connect(function()
-            TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                BackgroundColor3 = state and Color3.fromRGB(100, 200, 100) or disabledColor
-            }):Play()
+            TweenService:Create(toggle, TweenInfo.new(0.13), {BackgroundColor3 = state and Color3.fromRGB(110, 160, 110) or Color3.fromRGB(100,100,120)}):Play()
         end)
-
         toggle.MouseButton1Click:Connect(function()
             state = not state
-            local newColor = state and Color3.fromRGB(100, 200, 100) or disabledColor
-            TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = newColor}):Play()
-            if callback then
-                callback(state)
-            end
+            TweenService:Create(toggle, TweenInfo.new(0.15), {BackgroundColor3 = state and Color3.fromRGB(110,160,110) or Color3.fromRGB(100,100,120)}):Play()
+            if callback then callback(state) end
         end)
-
-        return frame, function()
-            return state
-        end
+        return frame
     end
 
     local function createSlider(parent, text, minValue, maxValue, initialValue, callback)
@@ -339,7 +225,7 @@ local function createUI()
         label.Text = text
         label.Size = UDim2.new(0.3, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(240, 230, 255) -- ярче текста слайдера
+        label.TextColor3 = Color3.fromRGB(230, 235, 255)
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextXAlignment = Enum.TextXAlignment.Left
@@ -348,32 +234,16 @@ local function createUI()
         local sliderBar = Instance.new("Frame")
         sliderBar.Size = UDim2.new(0.65, 0, 0, 30)
         sliderBar.Position = UDim2.new(0.35, 0, 0.5, -15)
-        sliderBar.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
+        sliderBar.BackgroundColor3 = Color3.fromRGB(53, 56, 74)
         sliderBar.BorderSizePixel = 0
         sliderBar.Parent = frame
-
-        local sliderBarGradient = Instance.new("UIGradient")
-        sliderBarGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(72, 72, 90)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 55, 70))
-        }
-        sliderBarGradient.Rotation = 90
-        sliderBarGradient.Parent = sliderBar
 
         local sliderFill = Instance.new("Frame")
         sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 0, 12)
         sliderFill.Position = UDim2.new(0, 0, 0.5, -6)
-        sliderFill.BackgroundColor3 = Color3.fromRGB(120, 120, 170)
+        sliderFill.BackgroundColor3 = Color3.fromRGB(117, 123, 169)
         sliderFill.BorderSizePixel = 0
         sliderFill.Parent = sliderBar
-
-        local sliderFillGradient = Instance.new("UIGradient")
-        sliderFillGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 140, 180)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(153, 51, 255))
-        }
-        sliderFillGradient.Rotation = 90
-        sliderFillGradient.Parent = sliderFill
 
         local dragging = false
 
@@ -393,13 +263,11 @@ local function createUI()
                 end
             end
         end)
-
         frame.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = false
             end
         end)
-
         frame.InputChanged:Connect(function(input)
             if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
                 local relativeX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
@@ -410,7 +278,6 @@ local function createUI()
                 end
             end
         end)
-
         return frame
     end
 
@@ -427,7 +294,7 @@ local function createUI()
         print("Кнопка нажата!")
     end)
 
-    local toggleFrame, getToggleState = createToggle(settingsPage, "Тумблер", false, function(state)
+    createToggle(settingsPage, "Тумблер", false, function(state)
         print("Состояние тумблера:", state)
     end)
 
