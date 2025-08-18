@@ -283,13 +283,11 @@ local function createTab(name, pageLabelText)
     buttonGradient.Rotation = 90
     buttonGradient.Parent = btn
 
-    -- Создаем ScrollingFrame как страницу вкладки
-    local page = Instance.new("ScrollingFrame")
+    local page = Instance.new("Frame")
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
     page.BackgroundTransparency = 0.7
     page.Visible = false
-    page.ScrollBarThickness = 6
     page.Parent = ContentFrame
 
     local label = Instance.new("TextLabel")
@@ -361,8 +359,6 @@ local function createUI()
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = true
 
-    -- Header and tabs
-
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 48)
@@ -388,7 +384,6 @@ local function createUI()
     TitleLabel.Size = UDim2.new(0, 200, 0, 32)
     TitleLabel.Parent = Header
 
-    -- Dragging logic
     local dragging = false
     local dragStart = nil
     local startPos = nil
@@ -398,7 +393,6 @@ local function createUI()
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
-
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -406,6 +400,7 @@ local function createUI()
             end)
         end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
@@ -418,7 +413,7 @@ local function createUI()
         end
     end)
 
-    local TabsBar = Instance.new("Frame")
+    TabsBar = Instance.new("Frame")
     TabsBar.Size = UDim2.new(1, -40, 0, 48)
     TabsBar.Position = UDim2.new(0, 20, 0, 58)
     TabsBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
@@ -439,7 +434,7 @@ local function createUI()
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Parent = TabsBar
 
-    local ContentFrame = Instance.new("Frame")
+    ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, -40, 1, -120)
     ContentFrame.Position = UDim2.new(0, 20, 0, 110)
     ContentFrame.BackgroundTransparency = 1
@@ -459,7 +454,6 @@ local function createUI()
         warn("Ошибка: tabPages[1] не инициализированы")
     end
 
-    -- Делаем вкладку "Settings" текущей, чтобы элементы были видны
     for _, v in pairs(tabPages) do
         v.page.Visible = false
         TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
@@ -468,7 +462,6 @@ local function createUI()
     tabPages[2].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
     showLabelWithFade(tabPages[2].label)
 
-    -- Добавляем элементы в settingsPage (ScrollingFrame)
     local configNameBox = Instance.new("TextBox")
     configNameBox.Size = UDim2.new(0, 220, 0, 36)
     configNameBox.Font = Enum.Font.Gotham
@@ -510,7 +503,7 @@ local function createUI()
             themeConfig = data.Theme or defaultThemeConfig
             scriptConfig = data.Script or defaultScriptConfig
             print("Конфиг загружен: "..name)
-            -- можно тут обновить GUI в соответствии с загруженными настройками
+            -- Обновления GUI на основе загруженных настроек можно добавить здесь
         else
             print("Конфиг с именем '"..name.."' не найден.")
         end
