@@ -256,6 +256,90 @@ local function createSlider(parent, text, minValue, maxValue, initialValue, call
     return frame
 end
 
+local function showLabelWithFade(label)
+    label.TextTransparency = 1
+    label.Visible = true
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(label, tweenInfo, {TextTransparency = 0})
+    tween:Play()
+end
+
+local function createTab(name, pageLabelText)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 140, 0, 44)
+    btn.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
+    btn.BorderSizePixel = 0
+    btn.Text = name
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 18
+    btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+    btn.Parent = TabsBar
+
+    local buttonGradient = Instance.new("UIGradient")
+    buttonGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 70, 200)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 40, 150))
+    }
+    buttonGradient.Rotation = 90
+    buttonGradient.Parent = btn
+
+    -- Создаем ScrollingFrame как страницу вкладки
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
+    page.BackgroundTransparency = 0.7
+    page.Visible = false
+    page.ScrollBarThickness = 6
+    page.Parent = ContentFrame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 28)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = pageLabelText
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 28
+    label.TextColor3 = Color3.fromRGB(180, 90, 255)
+    label.Parent = page
+
+    local textStroke = Instance.new("UIStroke")
+    textStroke.Thickness = 1.5
+    textStroke.Color = Color3.new(0, 0, 0)
+    textStroke.Transparency = 0.7
+    textStroke.Parent = label
+
+    local UIListLayoutPage = Instance.new("UIListLayout")
+    UIListLayoutPage.FillDirection = Enum.FillDirection.Vertical
+    UIListLayoutPage.Padding = UDim.new(0, 16)
+    UIListLayoutPage.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayoutPage.Parent = page
+    UIListLayoutPage.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+    label.LayoutOrder = 1
+
+    btn.MouseButton1Click:Connect(function()
+        for _, v in pairs(tabPages) do
+            if v.page.Visible then
+                local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+                tweenOut.Completed:Connect(function()
+                    v.page.Visible = false
+                end)
+                tweenOut:Play()
+            end
+            TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
+        end
+        page.Visible = true
+        page.BackgroundTransparency = 0.7
+        local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7})
+        tweenIn:Play()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
+        showLabelWithFade(label)
+    end)
+
+    tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
+    return page
+end
+
 local function createUI()
     if ScreenGui then
         ScreenGui:Destroy()
@@ -271,24 +355,14 @@ local function createUI()
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Size = UDim2.new(0, 700, 0, 480)
     MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = true
-    MainFrame.BackgroundTransparency = 1
 
-    local function fadeInUI(frame)
-        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(frame, tweenInfo, {
-            Size = UDim2.new(0, 700, 0, 480),
-            BackgroundTransparency = 0
-        })
-        tween:Play()
-    end
-    fadeInUI(MainFrame)
+    -- Header and tabs
 
-    -- Header with gradient
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 48)
@@ -344,7 +418,6 @@ local function createUI()
         end
     end)
 
-    -- TabsBar with gradient
     local TabsBar = Instance.new("Frame")
     TabsBar.Size = UDim2.new(1, -40, 0, 48)
     TabsBar.Position = UDim2.new(0, 20, 0, 58)
@@ -366,7 +439,6 @@ local function createUI()
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Parent = TabsBar
 
-    -- Content container
     local ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, -40, 1, -120)
     ContentFrame.Position = UDim2.new(0, 20, 0, 110)
@@ -375,80 +447,8 @@ local function createUI()
 
     tabPages = {}
 
-    local function showLabelWithFade(label)
-        label.TextTransparency = 1
-        label.Visible = true
-        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(label, tweenInfo, {TextTransparency = 0})
-        tween:Play()
-    end
-
-    local function createTab(name, pageLabelText)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 140, 0, 44)
-        btn.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
-        btn.BorderSizePixel = 0
-        btn.Text = name
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 18
-        btn.TextColor3 = Color3.fromRGB(230, 230, 230)
-        btn.Parent = TabsBar
-
-        local buttonGradient = Instance.new("UIGradient")
-        buttonGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 70, 200)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 40, 150))
-        }
-        buttonGradient.Rotation = 90
-        buttonGradient.Parent = btn
-
-        local page = Instance.new("Frame")
-        page.Size = UDim2.new(1, 0, 1, 0)
-        page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
-        page.BackgroundTransparency = 0.7
-        page.Visible = false
-        page.Parent = ContentFrame
-
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = pageLabelText
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 28
-        label.TextColor3 = Color3.fromRGB(180, 90, 255)
-        label.TextTransparency = 1
-        label.Parent = page
-
-        local textStroke = Instance.new("UIStroke")
-        textStroke.Thickness = 1.5
-        textStroke.Color = Color3.new(0, 0, 0)
-        textStroke.Transparency = 0.7
-        textStroke.Parent = label
-
-        btn.MouseButton1Click:Connect(function()
-            for _, v in pairs(tabPages) do
-                if v.page.Visible then
-                    local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-                    tweenOut.Completed:Connect(function()
-                        v.page.Visible = false
-                    end)
-                    tweenOut:Play()
-                end
-                TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
-            end
-            page.Visible = true
-            page.BackgroundTransparency = 0.7
-            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7})
-            tweenIn:Play()
-            TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
-            showLabelWithFade(label)
-        end)
-
-        tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
-    end
-
+    local settingsPage = createTab("Settings", "Настройки (будет дополнено)")
     createTab("Main", "Главная страница")
-    createTab("Settings", "Настройки (будет дополнено)")
     createTab("Credits", "Кредиты")
 
     if tabPages[1] and tabPages[1].button and tabPages[1].label then
@@ -459,16 +459,16 @@ local function createUI()
         warn("Ошибка: tabPages[1] не инициализированы")
     end
 
-    local settingsPage = tabPages[2].page
+    -- Делаем вкладку "Settings" текущей, чтобы элементы были видны
+    for _, v in pairs(tabPages) do
+        v.page.Visible = false
+        TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
+    end
+    settingsPage.Visible = true
+    tabPages[2].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
+    showLabelWithFade(tabPages[2].label)
 
-    local UIListLayoutSettings = Instance.new("UIListLayout")
-    UIListLayoutSettings.FillDirection = Enum.FillDirection.Vertical
-    UIListLayoutSettings.Padding = UDim.new(0, 16)
-    UIListLayoutSettings.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayoutSettings.Parent = settingsPage
-    UIListLayoutSettings.HorizontalAlignment = Enum.HorizontalAlignment.Left
-
-    -- Конфиг Input Box
+    -- Добавляем элементы в settingsPage (ScrollingFrame)
     local configNameBox = Instance.new("TextBox")
     configNameBox.Size = UDim2.new(0, 220, 0, 36)
     configNameBox.Font = Enum.Font.Gotham
@@ -481,8 +481,8 @@ local function createUI()
     local configBoxCorner = Instance.new("UICorner")
     configBoxCorner.CornerRadius = UDim.new(0, 12)
     configBoxCorner.Parent = configNameBox
+    configNameBox.LayoutOrder = 2
 
-    -- Кнопка Сохранить конфиг
     createButton(settingsPage, "Сохранить конфиг", function()
         local name = configNameBox.Text
         if name == "" then
@@ -496,9 +496,8 @@ local function createUI()
         local savePath = ROOT_FOLDER.."/"..name..".json"
         saveConfig(savePath, dataToSave)
         print("Конфиг сохранен под именем: "..name)
-    end)
+    end).LayoutOrder = 3
 
-    -- Кнопка Загрузить конфиг
     createButton(settingsPage, "Загрузить конфиг", function()
         local name = configNameBox.Text
         if name == "" then
@@ -511,29 +510,28 @@ local function createUI()
             themeConfig = data.Theme or defaultThemeConfig
             scriptConfig = data.Script or defaultScriptConfig
             print("Конфиг загружен: "..name)
-            -- Можно здесь добавить обновление GUI в соответствии с загруженными настройками
+            -- можно тут обновить GUI в соответствии с загруженными настройками
         else
             print("Конфиг с именем '"..name.."' не найден.")
         end
-    end)
-
-    -- Остальные элементы на странице настроек
+    end).LayoutOrder = 4
 
     createButton(settingsPage, "Нажми меня", function()
         print("Кнопка нажата!")
-    end)
+    end).LayoutOrder = 5
 
     local toggleFrame, getToggleState = createToggle(settingsPage, "Тумблер", false, function(state)
         print("Состояние тумблера:", state)
     end)
+    toggleFrame.LayoutOrder = 6
 
     createSlider(settingsPage, "Слайдер", 0, 100, 0.5, function(value)
         print("Значение слайдера:", math.floor(value))
-    end)
+    end).LayoutOrder = 7
 
     createButton(settingsPage, "Выключить GUI", function()
         ScreenGui:Destroy()
-    end)
+    end).LayoutOrder = 8
 end
 
 createUI()
