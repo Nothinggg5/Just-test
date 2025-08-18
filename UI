@@ -123,7 +123,7 @@ local function createToggle(parent, text, initialState, callback)
     label.Text = text
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(140, 140, 140) -- более приглушённый серый
+    label.TextColor3 = Color3.fromRGB(140, 140, 140)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 18
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -482,7 +482,7 @@ local function createUI()
     configBoxCorner.CornerRadius = UDim.new(0, 12)
     configBoxCorner.Parent = configNameBox
     configNameBox.LayoutOrder = 2
-    
+
     -- Dropdown Button
     local dropdownBtn = Instance.new("TextButton")
     dropdownBtn.Size = UDim2.new(0, 36, 0, 36)
@@ -583,39 +583,94 @@ local function createUI()
         print("Конфиг сохранен под именем: "..name)
     end).LayoutOrder = 5
 
-    createButton(settingsPage, "Загрузить конфиг", function()
+    -- Новая кнопка "Обновить конфиг"
+    createButton(settingsPage, "Обновить конфиг", function()
         local name = configNameBox.Text
         if name == "" then
-            print("Введите имя конфига перед загрузкой!")
+            print("Введите имя конфигурации перед обновлением!")
             return
         end
-        local loadPath = ROOT_FOLDER.."/"..name..".json"
-        local data = loadConfig(loadPath)
-        if data then
-            themeConfig = data.Theme or defaultThemeConfig
-            scriptConfig = data.Script or defaultScriptConfig
-            print("Конфиг загружен: "..name)
-        else
-            print("Конфиг с именем '"..name.."' не найден.")
-        end
+        local savePath = ROOT_FOLDER.."/"..name..".json"
+        local dataToSave = {
+            Theme = themeConfig,
+            Script = scriptConfig,
+        }
+        saveConfig(savePath, dataToSave)
+        print("Конфиг '"..name.."' обновлен.")
     end).LayoutOrder = 6
+
+    -- Новая кнопка "Удалить конфиг" с подтверждением
+    createButton(settingsPage, "Удалить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфигурации для удаления!")
+            return
+        end
+
+        if settingsPage:FindFirstChild("ConfirmDeleteFrame") then
+            settingsPage.ConfirmDeleteFrame:Destroy()
+        end
+
+        local confirmFrame = Instance.new("Frame")
+        confirmFrame.Name = "ConfirmDeleteFrame"
+        confirmFrame.Size = UDim2.new(0, 320, 0, 120)
+        confirmFrame.Position = UDim2.new(0, 200, 0, 200)
+        confirmFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
+        confirmFrame.BorderSizePixel = 0
+        confirmFrame.Parent = settingsPage
+        confirmFrame.ZIndex = 50
+
+        local confirmText = Instance.new("TextLabel")
+        confirmText.Size = UDim2.new(1, -20, 0, 60)
+        confirmText.Position = UDim2.new(0, 10, 0, 10)
+        confirmText.BackgroundTransparency = 1
+        confirmText.TextColor3 = Color3.fromRGB(220, 180, 180)
+        confirmText.TextWrapped = true
+        confirmText.Font = Enum.Font.GothamBold
+        confirmText.TextSize = 18
+        confirmText.Text = "Вы уверены, что хотите удалить конфиг:\n'"..name.."'?"
+        confirmText.Parent = confirmFrame
+
+        local yesBtn = createButton(confirmFrame, "Да", function()
+            local delPath = ROOT_FOLDER.."/"..name..".json"
+            if isfile(delPath) then
+                delfile(delPath)
+                print("Конфиг '"..name.."' удалён.")
+                configNameBox.Text = ""
+            else
+                print("Файл конфига для удаления не найден.")
+            end
+            dropdownMenu.Visible = false
+            confirmFrame:Destroy()
+        end)
+        yesBtn.Size = UDim2.new(0, 140, 0, 36)
+        yesBtn.Position = UDim2.new(0, 10, 1, -50)
+        yesBtn.Parent = confirmFrame
+
+        local noBtn = createButton(confirmFrame, "Нет", function()
+            confirmFrame:Destroy()
+        end)
+        noBtn.Size = UDim2.new(0, 140, 0, 36)
+        noBtn.Position = UDim2.new(0, 170, 1, -50)
+        noBtn.Parent = confirmFrame
+    end).LayoutOrder = 7
 
     createButton(settingsPage, "Нажми меня", function()
         print("Кнопка нажата!")
-    end).LayoutOrder = 7
+    end).LayoutOrder = 8
 
     local toggleFrame, getToggleState = createToggle(settingsPage, "Тумблер", false, function(state)
         print("Состояние тумблера:", state)
     end)
-    toggleFrame.LayoutOrder = 8
+    toggleFrame.LayoutOrder = 9
 
     createSlider(settingsPage, "Слайдер", 0, 100, 0.5, function(value)
         print("Значение слайдера:", math.floor(value))
-    end).LayoutOrder = 9
+    end).LayoutOrder = 10
 
     createButton(settingsPage, "Выключить GUI", function()
         ScreenGui:Destroy()
-    end).LayoutOrder = 10
+    end).LayoutOrder = 11
 end
 
 createUI()
