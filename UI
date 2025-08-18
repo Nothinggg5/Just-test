@@ -283,11 +283,14 @@ local function createTab(name, pageLabelText)
     buttonGradient.Rotation = 90
     buttonGradient.Parent = btn
 
-    local page = Instance.new("Frame")
+    -- Используем ScrollingFrame для страницы с прокруткой
+    local page = Instance.new("ScrollingFrame")
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
     page.BackgroundTransparency = 0.7
     page.Visible = false
+    page.ScrollBarThickness = 6
+    page.ScrollBarImageColor3 = Color3.fromRGB(153, 51, 255)
     page.Parent = ContentFrame
 
     local label = Instance.new("TextLabel")
@@ -299,6 +302,7 @@ local function createTab(name, pageLabelText)
     label.TextSize = 28
     label.TextColor3 = Color3.fromRGB(180, 90, 255)
     label.Parent = page
+    label.LayoutOrder = 1
 
     local textStroke = Instance.new("UIStroke")
     textStroke.Thickness = 1.5
@@ -313,7 +317,10 @@ local function createTab(name, pageLabelText)
     UIListLayoutPage.Parent = page
     UIListLayoutPage.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-    label.LayoutOrder = 1
+    -- Автоматическое изменение CanvasSize по содержимому
+    UIListLayoutPage:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, UIListLayoutPage.AbsoluteContentSize.Y + 16)
+    end)
 
     btn.MouseButton1Click:Connect(function()
         for _, v in pairs(tabPages) do
@@ -503,7 +510,7 @@ local function createUI()
             themeConfig = data.Theme or defaultThemeConfig
             scriptConfig = data.Script or defaultScriptConfig
             print("Конфиг загружен: "..name)
-            -- Обновления GUI на основе загруженных настроек можно добавить здесь
+            -- Обновления GUI при загрузке конфига можно добавить здесь
         else
             print("Конфиг с именем '"..name.."' не найден.")
         end
