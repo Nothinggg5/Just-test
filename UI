@@ -23,7 +23,7 @@ local function createUI()
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(38, 38, 48) -- светлее фон
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = true
@@ -142,7 +142,7 @@ local function createUI()
         btn.Text = name
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 18
-        btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+        btn.TextColor3 = Color3.fromRGB(230, 230, 255) -- ярче текст
         btn.Parent = TabsBar
 
         local buttonGradient = Instance.new("UIGradient")
@@ -201,12 +201,12 @@ local function createUI()
     createTab("Settings", "Настройки (будет дополнено)")
     createTab("Credits", "Кредиты")
 
-    if tabPages[1] and tabPages.button and tabPages.label then
-        tabPages.page.Visible = true
-        tabPages.button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
-        showLabelWithFade(tabPages.label)
+    if tabPages[1] and tabPages[1].button and tabPages[1].label then
+        tabPages[1].page.Visible = true
+        tabPages[1].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
+        showLabelWithFade(tabPages[1].label)
     else
-        warn("Ошибка: tabPages не инициализированы")
+        warn("Ошибка: tabPages[1] не инициализированы")
     end
 
     local function createButton(parent, text, callback)
@@ -217,7 +217,7 @@ local function createUI()
         button.Text = text
         button.Font = Enum.Font.GothamBold
         button.TextSize = 18
-        button.TextColor3 = Color3.fromRGB(230, 230, 230)
+        button.TextColor3 = Color3.fromRGB(240, 240, 255) -- ярче текст кнопок
         button.Parent = parent
 
         local buttonGradient = Instance.new("UIGradient")
@@ -240,7 +240,7 @@ local function createUI()
 
         button.MouseLeave:Connect(function()
             TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = originalColor}):Play()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(230,230,230)}):Play()
+            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(240,240,255)}):Play()
             TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 160, 0, 40)}):Play()
         end)
 
@@ -267,7 +267,7 @@ local function createUI()
         label.Text = text
         label.Size = UDim2.new(0.7, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        label.TextColor3 = Color3.fromRGB(240, 240, 255) -- ярче текста
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextXAlignment = Enum.TextXAlignment.Left
@@ -325,7 +325,7 @@ local function createUI()
         label.Text = text
         label.Size = UDim2.new(0.3, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        label.TextColor3 = Color3.fromRGB(240, 240, 255) -- ярче текста
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextXAlignment = Enum.TextXAlignment.Left
