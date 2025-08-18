@@ -1,0 +1,455 @@
+-------------------------------------------------------
+-- CONFIG MANAGEMENT
+-------------------------------------------------------
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+local configFile = "FullCustomGUI_Config.json"
+local function tableClone(tbl)
+    local out = {}; for k,v in pairs(tbl) do out[k]=v end; return out
+end
+local function loadConfig(filename, default)
+    if isfile and isfile(filename) then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile(filename))
+        end)
+        if ok and data then return tableClone(data) end
+    end
+    writefile(filename, HttpService:JSONEncode(default))
+    return tableClone(default)
+end
+local function saveConfig(filename, data)
+    if writefile then writefile(filename, HttpService:JSONEncode(data)) end
+end
+
+local DefaultTheme = {
+    bg       = {R=22, G=22, B=29},         -- основной фон
+    container= {R=29, G=29, B=38},         -- цвет фона секций
+    accent   = {R=115,G=67, B=190},        -- неоновый фиолетовый
+    neon     = {R=205,G=38,B=247},         -- контур-хайлайт
+    font     = {R=215,G=215,B=255},
+    btn_bg   = {R=40,G=40,B=55},
+    btn_on   = {R=55,G=205,B=180},
+    btn_off  = {R=80,G=25,B=50},
+    shadow   = {R=0,G=0,B=0},
+}
+local DefaultConfig = {
+    theme = tableClone(DefaultTheme),
+    guiKeybind = Enum.KeyCode.RightControl.Name,
+}
+local GUIConfig = loadConfig(configFile, DefaultConfig)
+
+local function Color(tbl) return Color3.fromRGB(tbl.R, tbl.G, tbl.B) end
+
+-------------------------------------------------------
+-- CORE GUI INIT
+-------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FullCustomGUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = LocalPlayer.PlayerGui
+
+-------------------------------------------------------
+-- MAIN WINDOW
+-------------------------------------------------------
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 650, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -325, 0.5, -210)
+mainFrame.BackgroundColor3 = Color(GUIConfig.theme.bg)
+mainFrame.BorderSizePixel = 0
+mainFrame.AnchorPoint = Vector2.new(0,0)
+mainFrame.Parent = screenGui
+mainFrame.Active = true
+
+-- Неоновый Outline
+local neonOutline = Instance.new("Frame")
+neonOutline.Size = UDim2.new(1, 8, 1, 8)
+neonOutline.Position = UDim2.new(0, -4, 0, -4)
+neonOutline.BackgroundColor3 = Color(GUIConfig.theme.neon)
+neonOutline.BorderSizePixel = 0
+neonOutline.ZIndex = 0
+neonOutline.Parent = mainFrame
+
+-- Мягкая Тень
+local shadowFrame = Instance.new("ImageLabel")
+shadowFrame.Size = UDim2.new(1.07,0,1.07,0)
+shadowFrame.Position = UDim2.new(-0.035,0,-0.035,0)
+shadowFrame.BackgroundTransparency = 1
+shadowFrame.Image = "rbxassetid://6886132108"
+shadowFrame.ImageTransparency = 0.7
+shadowFrame.ZIndex = -1
+shadowFrame.Parent = mainFrame
+
+-- Перемещение окна мышью
+local dragging, dragStart, startPos=nil,nil,nil
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+mainFrame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-------------------------------------------------------
+-- HEADER + ICON + BUTTONS
+-------------------------------------------------------
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1,0,0,55)
+header.BackgroundColor3 = Color(GUIConfig.theme.container)
+header.BorderSizePixel = 0
+header.Parent = mainFrame
+local icon = Instance.new("ImageLabel")
+icon.Size = UDim2.new(0,38,0,38)
+icon.Position = UDim2.new(0,15,0,8)
+icon.BackgroundTransparency = 1
+icon.Image = "rbxassetid://6031068421"
+icon.Parent = header
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1,-110,1,0)
+titleLabel.Position = UDim2.new(0,65,0,0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.GothamBlack
+titleLabel.TextSize = 24
+titleLabel.TextColor3 = Color(GUIConfig.theme.font)
+titleLabel.Text = "Custom Neon GUI Library"
+titleLabel.Parent = header
+
+-- Картинки-кнопки закрытия/сворачивания
+local closeBtn = Instance.new("ImageButton")
+closeBtn.Size = UDim2.new(0,32,0,32)
+closeBtn.Position = UDim2.new(1,-42,0,12)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Image = "rbxassetid://16860980138" -- кубик/или стильная иконка x
+closeBtn.Parent = header
+closeBtn.MouseButton1Click:Connect(function() screenGui.Enabled = false end)
+
+local minimizeBtn = Instance.new("ImageButton")
+minimizeBtn.Size = UDim2.new(0,32,0,32)
+minimizeBtn.Position = UDim2.new(1,-84,0,12)
+minimizeBtn.BackgroundTransparency = 1
+minimizeBtn.Image = "rbxassetid://16860980341"  -- кубик/или стильная стрелка вниз
+minimizeBtn.Parent = header
+local minimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    for _,v in ipairs(mainFrame:GetChildren()) do
+        if (v~=header and v~=neonOutline and v~=shadowFrame) then v.Visible = not minimized end
+    end
+    if minimized then
+        mainFrame.Size = UDim2.new(0,340,0,55)
+    else
+        mainFrame.Size = UDim2.new(0,650,0,420)
+    end
+end)
+
+-------------------------------------------------------
+-- TAB SYSTEM
+-------------------------------------------------------
+local tabNames = {
+    {"Главная", "rbxassetid://16524468025"},
+    {"Настройки", "rbxassetid://8949839002"},
+    {"Credits", "rbxassetid://6031763427"},
+    {"Демо-контролы", "rbxassetid://14522880250"},
+}
+local currTab = 1
+local tabBtns, tabContents = {}, {}
+
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1,-36,0,42)
+tabBar.Position = UDim2.new(0,18,0,58)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = mainFrame
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabLayout.Padding = UDim.new(0,14)
+tabLayout.Parent = tabBar
+
+for idx,info in ipairs(tabNames) do
+    local tabBtn = Instance.new("ImageButton")
+    tabBtn.Size = UDim2.new(0,130,0,38)
+    tabBtn.BackgroundColor3 = (idx==1) and Color(GUIConfig.theme.accent) or Color(GUIConfig.theme.container)
+    tabBtn.BorderSizePixel = 0
+    tabBtn.Image = info[2]
+    tabBtn.ZIndex = 3
+    tabBtn.Parent = tabBar
+
+    local tabText = Instance.new("TextLabel")
+    tabText.Size = UDim2.new(1,0,1,-18)
+    tabText.Position = UDim2.new(0,0,0,18)
+    tabText.BackgroundTransparency = 1
+    tabText.Text = info[1]
+    tabText.Font = Enum.Font.GothamBold
+    tabText.TextSize = 15
+    tabText.TextColor3 = Color(GUIConfig.theme.font)
+    tabText.Parent = tabBtn
+
+    local cont = Instance.new("Frame")
+    cont.Size = UDim2.new(1,-40,1,-128)
+    cont.Position = UDim2.new(0,20,0,106)
+    cont.BackgroundColor3 = Color(GUIConfig.theme.container)
+    cont.BorderColor3 = Color(GUIConfig.theme.neon)
+    cont.BorderSizePixel = 3
+    cont.Visible = (idx==1)
+    cont.Parent = mainFrame
+
+    tabBtn.MouseButton1Click:Connect(function()
+        for i,btn in ipairs(tabBtns) do
+            btn.BackgroundColor3 = Color(GUIConfig.theme.container)
+            tabContents[i].Visible = false
+        end
+        tabBtn.BackgroundColor3 = Color(GUIConfig.theme.accent)
+        cont.Visible = true
+        currTab = idx
+    end)
+
+    table.insert(tabBtns, tabBtn)
+    table.insert(tabContents, cont)
+end
+
+-------------------------------------------------------
+-- DEMO CUSTOM CONTROLS: BUTTON, TOGGLE, SLIDER, DROPDOWN
+-------------------------------------------------------
+local demoTab = tabContents[4]
+local demoLayout = Instance.new("UIListLayout")
+demoLayout.FillDirection = Enum.FillDirection.Vertical
+demoLayout.SortOrder = Enum.SortOrder.LayoutOrder
+demoLayout.Padding = UDim.new(0,18)
+demoLayout.Parent = demoTab
+
+-- BUTTON
+local demoBtn = Instance.new("TextButton")
+demoBtn.Size = UDim2.new(0.35,0,0,40)
+demoBtn.BackgroundColor3 = Color(GUIConfig.theme.btn_bg)
+demoBtn.TextColor3 = Color(GUIConfig.theme.accent)
+demoBtn.Font = Enum.Font.GothamBold
+demoBtn.TextSize = 18
+demoBtn.Text = "Красная Неоновая Кнопка"
+demoBtn.BorderColor3 = Color(GUIConfig.theme.neon)
+demoBtn.BorderSizePixel = 2
+demoBtn.AutoButtonColor = true
+demoBtn.Parent = demoTab
+
+-- TOGGLE (красивый)
+local demoToggleVal = false
+local demoToggle = Instance.new("ImageButton")
+demoToggle.Size = UDim2.new(0,54,0,32)
+demoToggle.BackgroundTransparency = 1
+demoToggle.Image = demoToggleVal and "rbxassetid://15049621329" or "rbxassetid://15049623555"
+demoToggle.Parent = demoTab
+demoToggle.MouseButton1Click:Connect(function()
+    demoToggleVal = not demoToggleVal
+    demoToggle.Image = demoToggleVal and "rbxassetid://15049621329" or "rbxassetid://15049623555"
+end)
+
+-- SLIDER
+local demoSliderVal = 0.5
+local demoSlider = Instance.new("Frame")
+demoSlider.Size = UDim2.new(0,180,0,26)
+demoSlider.BackgroundTransparency = 1
+demoSlider.Parent = demoTab
+local sliderBar = Instance.new("Frame")
+sliderBar.Size = UDim2.new(0.85,0,0,6)
+sliderBar.Position = UDim2.new(0.05,0,0.5,-3)
+sliderBar.BackgroundColor3 = Color(GUIConfig.theme.neon)
+sliderBar.BorderSizePixel = 0
+sliderBar.Parent = demoSlider
+local ball = Instance.new("ImageButton")
+ball.Size = UDim2.new(0,22,0,22)
+ball.Position = UDim2.new(demoSliderVal, -11, 0.5, -11)
+ball.Image = "rbxassetid://14522880250"
+ball.BackgroundTransparency = 1
+ball.Parent = demoSlider
+ball.MouseButton1Down:Connect(function()
+    local conn; conn = UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseMovement then
+            local x = math.clamp((input.Position.X-demoSlider.AbsolutePosition.X)/demoSlider.AbsoluteSize.X,0,1)
+            ball.Position = UDim2.new(x,-11,0.5,-11)
+            demoSliderVal = x; -- print(x)
+        end
+    end)
+    ball.MouseButton1Up:Connect(function() conn:Disconnect() end)
+end)
+
+-- DROPDOWN
+local demoDropdown = Instance.new("Frame")
+demoDropdown.Size = UDim2.new(0,160,0,30)
+demoDropdown.BackgroundTransparency = 1
+demoDropdown.Parent = demoTab
+local dropdownBtn = Instance.new("TextButton")
+dropdownBtn.Size = UDim2.new(1,0,1,0)
+dropdownBtn.Text = "Выбрать вариант"
+dropdownBtn.BackgroundColor3 = Color(GUIConfig.theme.btn_bg)
+dropdownBtn.BorderColor3 = Color(GUIConfig.theme.neon)
+dropdownBtn.TextSize = 15
+dropdownBtn.Font = Enum.Font.GothamSemibold
+dropdownBtn.TextColor3 = Color(GUIConfig.theme.font)
+dropdownBtn.Parent = demoDropdown
+
+local dropdownList = {"Вариант 1","Вариант 2","Вариант 3"}
+local ddList = Instance.new("Frame")
+ddList.Size = UDim2.new(1,0,0,#dropdownList*28)
+ddList.Position = UDim2.new(0,0,1,0)
+ddList.BackgroundColor3 = Color(GUIConfig.theme.btn_bg)
+ddList.BorderColor3 = Color(GUIConfig.theme.neon)
+ddList.BorderSizePixel = 2
+ddList.Visible = false
+ddList.Parent = demoDropdown
+
+for i,opt in ipairs(dropdownList) do
+    local dBtn = Instance.new("TextButton")
+    dBtn.Size = UDim2.new(1,0,0,28)
+    dBtn.Position = UDim2.new(0,0,0,(i-1)*28)
+    dBtn.Text = opt
+    dBtn.BackgroundColor3 = Color(GUIConfig.theme.btn_bg)
+    dBtn.TextSize = 14
+    dBtn.Font = Enum.Font.Gotham
+    dBtn.TextColor3 = Color(GUIConfig.theme.font)
+    dBtn.Parent = ddList
+    dBtn.MouseButton1Click:Connect(function()
+        dropdownBtn.Text = opt
+        ddList.Visible = false
+    end)
+end
+dropdownBtn.MouseButton1Click:Connect(function() ddList.Visible = not ddList.Visible end)
+
+-------------------------------------------------------
+-- SETTINGS TAB (цвета, бинды) - стиль и функции смены темы
+-------------------------------------------------------
+local settingsTab = tabContents[2]
+local setLayout = Instance.new("UIListLayout")
+setLayout.FillDirection = Enum.FillDirection.Vertical
+setLayout.SortOrder = Enum.SortOrder.LayoutOrder
+setLayout.Padding = UDim.new(0,18)
+setLayout.Parent = settingsTab
+
+local colorLabel = Instance.new("TextLabel")
+colorLabel.Size = UDim2.new(0,200,0,28)
+colorLabel.BackgroundTransparency = 1
+colorLabel.Text = "Темы (клик — сменить)"
+colorLabel.TextColor3 = Color(GUIConfig.theme.font)
+colorLabel.Font = Enum.Font.GothamSemibold
+colorLabel.TextSize = 17
+colorLabel.Parent = settingsTab
+
+local colors = {
+    {R=22,G=22,B=29}, -- dark
+    {R=30,G=17,B=47}, -- dark-purple
+    {R=0,G=0,B=0},    -- black
+}
+for i,clr in ipairs(colors) do
+    local colBtn = Instance.new("TextButton")
+    colBtn.Size = UDim2.new(0,38,0,28)
+    colBtn.BackgroundColor3 = Color(clr)
+    colBtn.Text = ""
+    colBtn.BorderColor3 = Color(GUIConfig.theme.neon)
+    colBtn.BorderSizePixel = 2
+    colBtn.Parent = settingsTab
+    colBtn.MouseButton1Click:Connect(function()
+        GUIConfig.theme.bg = tableClone(clr)
+        mainFrame.BackgroundColor3 = Color(clr)
+        neonOutline.BackgroundColor3 = Color(GUIConfig.theme.neon)
+        saveConfig(configFile, GUIConfig)
+    end)
+end
+local accentLabel = Instance.new("TextLabel")
+accentLabel.Size = UDim2.new(0,200,0,26)
+accentLabel.BackgroundTransparency = 1
+accentLabel.Text = "Неоновый акцент:"
+accentLabel.TextColor3 = Color(GUIConfig.theme.neon)
+accentLabel.Font = Enum.Font.GothamSemibold
+accentLabel.TextSize = 17
+accentLabel.Parent = settingsTab
+local accentBtn = Instance.new("TextButton")
+accentBtn.Size = UDim2.new(0,38,0,22)
+accentBtn.BackgroundColor3 = Color(GUIConfig.theme.accent)
+accentBtn.Parent = settingsTab
+accentBtn.MouseButton1Click:Connect(function()
+    local newC = Color3.fromHSV(math.random(), 0.9, 0.92)
+    GUIConfig.theme.accent = {R=math.floor(newC.R*255),G=math.floor(newC.G*255),B=math.floor(newC.B*255)}
+    for _,btn in ipairs(tabBtns) do
+        btn.BackgroundColor3 = Color(GUIConfig.theme.accent)
+    end
+    saveConfig(configFile, GUIConfig)
+end)
+
+-- Keybind
+local bindLabel = Instance.new("TextLabel")
+bindLabel.Size = UDim2.new(0,140,0,26)
+bindLabel.BackgroundTransparency = 1
+bindLabel.Text = "Keybind для GUI:"
+bindLabel.TextColor3 = Color(GUIConfig.theme.font)
+bindLabel.Font = Enum.Font.GothamSemibold
+bindLabel.TextSize = 16
+bindLabel.Parent = settingsTab
+
+local bindBtn = Instance.new("TextButton")
+bindBtn.Size = UDim2.new(0,70,0,26)
+bindBtn.BackgroundColor3 = Color(GUIConfig.theme.btn_bg)
+bindBtn.Text = GUIConfig.guiKeybind
+bindBtn.TextColor3 = Color(GUIConfig.theme.neon)
+bindBtn.TextSize = 15
+bindBtn.Font = Enum.Font.GothamBold
+bindBtn.BorderColor3 = Color(GUIConfig.theme.neon)
+bindBtn.BorderSizePixel = 2
+bindBtn.Parent = settingsTab
+bindBtn.MouseButton1Click:Connect(function()
+    bindBtn.Text = "..."
+    local keyConn
+    keyConn = UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            GUIConfig.guiKeybind = input.KeyCode.Name
+            bindBtn.Text = input.KeyCode.Name
+            saveConfig(configFile, GUIConfig)
+            keyConn:Disconnect()
+        end
+    end)
+end)
+
+-------------------------------------------------------
+-- CREDITS TAB
+-------------------------------------------------------
+local creditsTab = tabContents[3]
+local creditsLbl = Instance.new("TextLabel")
+creditsLbl.Size = UDim2.new(1,-20,0,100)
+creditsLbl.Position = UDim2.new(0,10,0,30)
+creditsLbl.BackgroundTransparency = 1
+creditsLbl.TextColor3 = Color(GUIConfig.theme.accent)
+creditsLbl.Font = Enum.Font.GothamBold
+creditsLbl.TextSize = 21
+creditsLbl.TextWrapped = true
+creditsLbl.Text = [[
+Custom Neon GUI for Exploits
+Автор: Ваш AI
+Дизайн inspired by xsx / Rayfield
+2025 | Beta | For Solara
+]]
+creditsLbl.Parent = creditsTab
+
+-------------------------------------------------------
+-- GLOBAL KEYBIND - SHOW/HIDE GUI
+-------------------------------------------------------
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode.Name == GUIConfig.guiKeybind then
+        screenGui.Enabled = not screenGui.Enabled
+    end
+end)
+-------------------------------------------------------
+
+-- БИБЛИОТЕКА ГОТОВА: 
+-- добавляйте свои вкладки, элементы, компоненты на demoTab
+-- можно с нуля строить любые панели и расширять библиотеку
+-- все темы, вкладки и настройки сохраняются, визуал масштабируем
