@@ -39,7 +39,7 @@ local function createUI()
     end
     fadeInUI(MainFrame)
 
-    -- Header with gradient
+    -- Header with soft gradient
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 48)
@@ -49,8 +49,8 @@ local function createUI()
 
     local headerGradient = Instance.new("UIGradient")
     headerGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 120)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 80))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(44,44,60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(28,28,36))
     }
     headerGradient.Rotation = 90
     headerGradient.Parent = Header
@@ -95,7 +95,7 @@ local function createUI()
         end
     end)
 
-    -- TabsBar with gradient
+    -- TabsBar with soft gradient
     local TabsBar = Instance.new("Frame")
     TabsBar.Size = UDim2.new(1, -40, 0, 48)
     TabsBar.Position = UDim2.new(0, 20, 0, 58)
@@ -105,8 +105,8 @@ local function createUI()
 
     local tabsGradient = Instance.new("UIGradient")
     tabsGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 30, 150)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 20, 90))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(55,48,65)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(38,33,48))
     }
     tabsGradient.Rotation = 90
     tabsGradient.Parent = TabsBar
@@ -147,8 +147,8 @@ local function createUI()
 
         local buttonGradient = Instance.new("UIGradient")
         buttonGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 70, 200)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 40, 150))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 60, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 35, 70))
         }
         buttonGradient.Rotation = 90
         buttonGradient.Parent = btn
@@ -201,12 +201,12 @@ local function createUI()
     createTab("Settings", "Настройки (будет дополнено)")
     createTab("Credits", "Кредиты")
 
-    if tabPages[1] and tabPages[1].button and tabPages[1].label then
-        tabPages[1].page.Visible = true
-        tabPages[1].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
-        showLabelWithFade(tabPages[1].label)
+    if tabPages[1] and tabPages.button and tabPages.label then
+        tabPages.page.Visible = true
+        tabPages.button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
+        showLabelWithFade(tabPages.label)
     else
-        warn("Ошибка: tabPages[1] не инициализированы")
+        warn("Ошибка: tabPages не инициализированы")
     end
 
     local function createButton(parent, text, callback)
@@ -222,8 +222,8 @@ local function createUI()
 
         local buttonGradient = Instance.new("UIGradient")
         buttonGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 50, 180)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 30, 120))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 60, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 35, 70))
         }
         buttonGradient.Rotation = 90
         buttonGradient.Parent = button
@@ -334,14 +334,14 @@ local function createUI()
         local sliderBar = Instance.new("Frame")
         sliderBar.Size = UDim2.new(0.65, 0, 0, 30)
         sliderBar.Position = UDim2.new(0.35, 0, 0.5, -15)
-        sliderBar.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+        sliderBar.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
         sliderBar.BorderSizePixel = 0
         sliderBar.Parent = frame
 
         local sliderBarGradient = Instance.new("UIGradient")
         sliderBarGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 90, 120)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 70))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(72, 72, 90)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 55, 70))
         }
         sliderBarGradient.Rotation = 90
         sliderBarGradient.Parent = sliderBar
@@ -349,14 +349,14 @@ local function createUI()
         local sliderFill = Instance.new("Frame")
         sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 0, 12)
         sliderFill.Position = UDim2.new(0, 0, 0.5, -6)
-        sliderFill.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
+        sliderFill.BackgroundColor3 = Color3.fromRGB(120, 120, 170)
         sliderFill.BorderSizePixel = 0
         sliderFill.Parent = sliderBar
 
         local sliderFillGradient = Instance.new("UIGradient")
         sliderFillGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 120, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 50, 230))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 140, 180)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(153, 51, 255))
         }
         sliderFillGradient.Rotation = 90
         sliderFillGradient.Parent = sliderFill
