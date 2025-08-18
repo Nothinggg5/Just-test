@@ -142,7 +142,7 @@ local function createUI()
         btn.Text = name
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 18
-        btn.TextColor3 = Color3.fromRGB(230, 230, 255) -- ярче текст
+        btn.TextColor3 = Color3.fromRGB(230, 210, 240) -- чуть теплее и ярче для вкладок
         btn.Parent = TabsBar
 
         local buttonGradient = Instance.new("UIGradient")
@@ -153,6 +153,12 @@ local function createUI()
         buttonGradient.Rotation = 90
         buttonGradient.Parent = btn
 
+        local btnTextStroke = Instance.new("UIStroke")
+        btnTextStroke.Color = Color3.fromRGB(60, 40, 90)
+        btnTextStroke.Thickness = 1
+        btnTextStroke.Transparency = 0.3
+        btnTextStroke.Parent = btn
+
         local page = Instance.new("Frame")
         page.Size = UDim2.new(1, 0, 1, 0)
         page.BackgroundTransparency = 1
@@ -161,12 +167,14 @@ local function createUI()
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
+        label.BackgroundTransparency = 0.4 -- чуть затемнил фон для читаемости
+        label.BackgroundColor3 = Color3.fromRGB(38, 30, 48)
         label.Text = pageLabelText
         label.Font = Enum.Font.GothamBold
         label.TextSize = 28
-        label.TextColor3 = Color3.fromRGB(180, 90, 255)
-        label.TextTransparency = 1
+        label.TextColor3 = Color3.fromRGB(130, 80, 150) -- приглушённый пурпурный
+        label.TextTransparency = 0
+        label.TextStrokeTransparency = 0.5 -- полупрозрачный текстовый контур
         label.Parent = page
 
         local textStroke = Instance.new("UIStroke")
@@ -187,8 +195,8 @@ local function createUI()
                 TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
             end
             page.Visible = true
-            page.BackgroundTransparency = 1
-            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+            page.BackgroundTransparency = 0
+            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.4})
             tweenIn:Play()
             TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
             showLabelWithFade(label)
@@ -217,7 +225,7 @@ local function createUI()
         button.Text = text
         button.Font = Enum.Font.GothamBold
         button.TextSize = 18
-        button.TextColor3 = Color3.fromRGB(240, 240, 255) -- ярче текст кнопок
+        button.TextColor3 = Color3.fromRGB(240, 230, 255) -- ярче текста на кнопках
         button.Parent = parent
 
         local buttonGradient = Instance.new("UIGradient")
@@ -227,6 +235,12 @@ local function createUI()
         }
         buttonGradient.Rotation = 90
         buttonGradient.Parent = button
+
+        local buttonTextStroke = Instance.new("UIStroke")
+        buttonTextStroke.Color = Color3.fromRGB(50, 30, 90)
+        buttonTextStroke.Thickness = 1
+        buttonTextStroke.Transparency = 0.5
+        buttonTextStroke.Parent = button
 
         local originalColor = button.BackgroundColor3
         local hoverColor = Color3.fromRGB(120, 70, 180)
@@ -240,7 +254,7 @@ local function createUI()
 
         button.MouseLeave:Connect(function()
             TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = originalColor}):Play()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(240,240,255)}):Play()
+            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(240,230,255)}):Play()
             TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 160, 0, 40)}):Play()
         end)
 
@@ -267,7 +281,7 @@ local function createUI()
         label.Text = text
         label.Size = UDim2.new(0.7, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(240, 240, 255) -- ярче текста
+        label.TextColor3 = Color3.fromRGB(240, 230, 255) -- ярче текста тумблера
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextXAlignment = Enum.TextXAlignment.Left
@@ -325,7 +339,7 @@ local function createUI()
         label.Text = text
         label.Size = UDim2.new(0.3, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(240, 240, 255) -- ярче текста
+        label.TextColor3 = Color3.fromRGB(240, 230, 255) -- ярче текста слайдера
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextXAlignment = Enum.TextXAlignment.Left
