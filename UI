@@ -283,7 +283,7 @@ local function createTab(name, pageLabelText)
     buttonGradient.Rotation = 90
     buttonGradient.Parent = btn
 
-    -- Используем ScrollingFrame для страницы с прокруткой
+    -- ScrollingFrame для вкладки
     local page = Instance.new("ScrollingFrame")
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
@@ -317,7 +317,6 @@ local function createTab(name, pageLabelText)
     UIListLayoutPage.Parent = page
     UIListLayoutPage.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
-    -- Автоматическое изменение CanvasSize по содержимому
     UIListLayoutPage:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         page.CanvasSize = UDim2.new(0, 0, 0, UIListLayoutPage.AbsoluteContentSize.Y + 16)
     end)
@@ -328,8 +327,11 @@ local function createTab(name, pageLabelText)
                 local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
                 tweenOut.Completed:Connect(function()
                     v.page.Visible = false
+                    v.label.Visible = false
                 end)
                 tweenOut:Play()
+            else
+                v.label.Visible = false
             end
             TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
         end
@@ -338,7 +340,8 @@ local function createTab(name, pageLabelText)
         local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7})
         tweenIn:Play()
         TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
-        showLabelWithFade(label)
+        page.label.Visible = true
+        showLabelWithFade(page.label)
     end)
 
     tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
@@ -449,25 +452,23 @@ local function createUI()
 
     tabPages = {}
 
+    local mainPage = createTab("Main", "Главная страница")
     local settingsPage = createTab("Settings", "Настройки (будет дополнено)")
-    createTab("Main", "Главная страница")
     createTab("Credits", "Кредиты")
 
-    if tabPages[1] and tabPages[1].button and tabPages[1].label then
+    for _, v in pairs(tabPages) do
+        v.page.Visible = false
+        v.label.Visible = false
+        TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
+    end
+    if tabPages[1] then
         tabPages[1].page.Visible = true
+        tabPages[1].label.Visible = true
         tabPages[1].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
         showLabelWithFade(tabPages[1].label)
     else
         warn("Ошибка: tabPages[1] не инициализированы")
     end
-
-    for _, v in pairs(tabPages) do
-        v.page.Visible = false
-        TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
-    end
-    settingsPage.Visible = true
-    tabPages[2].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
-    showLabelWithFade(tabPages[2].label)
 
     local configNameBox = Instance.new("TextBox")
     configNameBox.Size = UDim2.new(0, 220, 0, 36)
@@ -510,7 +511,7 @@ local function createUI()
             themeConfig = data.Theme or defaultThemeConfig
             scriptConfig = data.Script or defaultScriptConfig
             print("Конфиг загружен: "..name)
-            -- Обновления GUI при загрузке конфига можно добавить здесь
+            -- Возможное обновление GUI при загрузке можно добавить здесь
         else
             print("Конфиг с именем '"..name.."' не найден.")
         end
