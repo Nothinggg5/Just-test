@@ -486,4 +486,177 @@ local function createUI()
     -- Dropdown Button
     local dropdownBtn = Instance.new("TextButton")
     dropdownBtn.Size = UDim2.new(0, 36, 0, 36)
-    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50,
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
+    dropdownBtn.Text = "▼"
+    dropdownBtn.Font = Enum.Font.GothamBold
+    dropdownBtn.TextSize = 18
+    dropdownBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+    dropdownBtn.Parent = settingsPage
+    dropdownBtn.LayoutOrder = 3
+
+    local dropdownMenu = Instance.new("Frame")
+    dropdownMenu.Size = UDim2.new(0, 260, 0, 150)
+    dropdownMenu.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
+    dropdownMenu.BorderSizePixel = 1
+    dropdownMenu.BorderColor3 = Color3.fromRGB(153, 51, 255)
+    dropdownMenu.Visible = false
+    dropdownMenu.ZIndex = 50
+    dropdownMenu.Active = true
+    dropdownMenu.Parent = settingsPage
+    dropdownMenu.LayoutOrder = 4
+
+    local uiLayout = Instance.new("UIListLayout")
+    uiLayout.Parent = dropdownMenu
+    uiLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiLayout.Padding = UDim.new(0, 4)
+
+    local function updateDropdownConfigs()
+        for i, child in pairs(dropdownMenu:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        local success, list = pcall(function()
+            return listfiles(ROOT_FOLDER)
+        end)
+
+        if success and list then
+            local order = 1
+            for _, filePath in pairs(list) do
+                if filePath:sub(-5) == ".json" then
+                    local fileName = filePath:match("([^\\/]+)$")
+                    fileName = fileName:gsub("%.json$", "")
+                    local btn = Instance.new("TextButton")
+                    btn.Size = UDim2.new(1, -12, 0, 30)
+                    btn.BackgroundColor3 = Color3.fromRGB(70, 40, 110)
+                    btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+                    btn.Font = Enum.Font.GothamBold
+                    btn.TextSize = 18
+                    btn.Text = fileName
+                    btn.Parent = dropdownMenu
+                    btn.LayoutOrder = order
+                    order = order + 1
+
+                    btn.MouseButton1Click:Connect(function()
+                        configNameBox.Text = fileName
+                        dropdownMenu.Visible = false
+                    end)
+                end
+            end
+        else
+            print("Не удалось получить список файлов конфигов из папки "..ROOT_FOLDER)
+        end
+    end
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        dropdownMenu.Visible = not dropdownMenu.Visible
+        if dropdownMenu.Visible then
+            updateDropdownConfigs()
+        end
+    end)
+
+    createButton(settingsPage, "Сохранить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфига перед сохранением!")
+            return
+        end
+        local dataToSave = {
+            Theme = themeConfig,
+            Script = scriptConfig,
+        }
+        local savePath = ROOT_FOLDER.."/"..name..".json"
+        saveConfig(savePath, dataToSave)
+        print("Конфиг сохранен под именем: "..name)
+    end).LayoutOrder = 5
+
+    createButton(settingsPage, "Обновить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфигурации перед обновлением!")
+            return
+        end
+        local savePath = ROOT_FOLDER.."/"..name..".json"
+        local dataToSave = {
+            Theme = themeConfig,
+            Script = scriptConfig,
+        }
+        saveConfig(savePath, dataToSave)
+        print("Конфиг '"..name.."' обновлен.")
+    end).LayoutOrder = 6
+
+    createButton(settingsPage, "Удалить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфигурации для удаления!")
+            return
+        end
+
+        if settingsPage:FindFirstChild("ConfirmDeleteFrame") then
+            settingsPage.ConfirmDeleteFrame:Destroy()
+        end
+
+        local confirmFrame = Instance.new("Frame")
+        confirmFrame.Name = "ConfirmDeleteFrame"
+        confirmFrame.Size = UDim2.new(0, 320, 0, 120)
+        confirmFrame.Position = UDim2.new(0, 200, 0, 200)
+        confirmFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
+        confirmFrame.BorderSizePixel = 0
+        confirmFrame.Parent = settingsPage
+        confirmFrame.ZIndex = 50
+
+        local confirmText = Instance.new("TextLabel")
+        confirmText.Size = UDim2.new(1, -20, 0, 60)
+        confirmText.Position = UDim2.new(0, 10, 0, 10)
+        confirmText.BackgroundTransparency = 1
+        confirmText.TextColor3 = Color3.fromRGB(220, 180, 180)
+        confirmText.TextWrapped = true
+        confirmText.Font = Enum.Font.GothamBold
+        confirmText.TextSize = 18
+        confirmText.Text = "Вы уверены, что хотите удалить конфиг:\n'"..name.."'?"
+        confirmText.Parent = confirmFrame
+
+        local yesBtn = createButton(confirmFrame, "Да", function()
+            local delPath = ROOT_FOLDER.."/"..name..".json"
+            if isfile(delPath) then
+                delfile(delPath)
+                print("Конфиг '"..name.."' удалён.")
+                configNameBox.Text = ""
+            else
+                print("Файл конфига для удаления не найден.")
+            end
+            dropdownMenu.Visible = false
+            confirmFrame:Destroy()
+        end)
+        yesBtn.Size = UDim2.new(0, 140, 0, 36)
+        yesBtn.Position = UDim2.new(0, 10, 1, -50)
+        yesBtn.Parent = confirmFrame
+
+        local noBtn = createButton(confirmFrame, "Нет", function()
+            confirmFrame:Destroy()
+        end)
+        noBtn.Size = UDim2.new(0, 140, 0, 36)
+        noBtn.Position = UDim2.new(0, 170, 1, -50)
+        noBtn.Parent = confirmFrame
+    end).LayoutOrder = 7
+
+    createButton(settingsPage, "Нажми меня", function()
+        print("Кнопка нажата!")
+    end).LayoutOrder = 8
+
+    local toggleFrame, getToggleState = createToggle(settingsPage, "Тумблер", false, function(state)
+        print("Состояние тумблера:", state)
+    end)
+    toggleFrame.LayoutOrder = 9
+
+    createSlider(settingsPage, "Слайдер", 0, 100, 0.5, function(value)
+        print("Значение слайдера:", math.floor(value))
+    end).LayoutOrder = 10
+
+    createButton(settingsPage, "Выключить GUI", function()
+        ScreenGui:Destroy()
+    end).LayoutOrder = 11
+end
+
+createUI()
