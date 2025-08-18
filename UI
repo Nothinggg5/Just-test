@@ -324,7 +324,7 @@ local function createTab(name, pageLabelText)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 18
     btn.TextColor3 = getColor3(themeConfig.Text)
-    btn.Parent = TabsBar
+    btn.Parent = UIRefs.TabsBar
 
     local buttonGradient = Instance.new("UIGradient")
     buttonGradient.Color = ColorSequence.new{
@@ -343,9 +343,8 @@ local function createTab(name, pageLabelText)
     page.Visible = false
     page.ScrollBarThickness = 6
     page.ScrollBarImageColor3 = getColor3(themeConfig.Accent)
-    page.Parent = ContentFrame
+    page.Parent = UIRefs.ContentFrame
 
-    -- Создаём label с конкретным названием, чтобы избежать ошибок
     local label = Instance.new("TextLabel")
     label.Name = "PageLabel"
     label.Size = UDim2.new(1, 0, 0, 28)
@@ -382,18 +381,13 @@ local function createTab(name, pageLabelText)
                 local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
                 tweenOut.Completed:Connect(function()
                     v.page.Visible = false
-                    -- Безопасный доступ к label
                     local lbl = v.page:FindFirstChild("PageLabel")
-                    if lbl then
-                        lbl.Visible = false
-                    end
+                    if lbl then lbl.Visible = false end
                 end)
                 tweenOut:Play()
             else
                 local lbl = v.page:FindFirstChild("PageLabel")
-                if lbl then
-                    lbl.Visible = false
-                end
+                if lbl then lbl.Visible = false end
             end
             TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = getColor3(themeConfig.TabButton)}):Play()
         end
@@ -413,7 +407,6 @@ local function createTab(name, pageLabelText)
     return page
 end
 
--- Основная функция создания интерфейса
 local function createUI()
     if ScreenGui then
         ScreenGui:Destroy()
@@ -491,7 +484,7 @@ local function createUI()
         end
     end)
 
-    TabsBar = Instance.new("Frame")
+    local TabsBar = Instance.new("Frame")
     TabsBar.Size = UDim2.new(1, -40, 0, 48)
     TabsBar.Position = UDim2.new(0, 20, 0, 58)
     TabsBar.BackgroundColor3 = getColor3(themeConfig.TabButton)
@@ -513,11 +506,12 @@ local function createUI()
     UIListLayoutTabs.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayoutTabs.Parent = TabsBar
 
-    ContentFrame = Instance.new("Frame")
+    local ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, -40, 1, -120)
     ContentFrame.Position = UDim2.new(0, 20, 0, 110)
     ContentFrame.BackgroundTransparency = 1
     ContentFrame.Parent = MainFrame
+    UIRefs.ContentFrame = ContentFrame
 
     tabPages = {}
 
@@ -526,10 +520,9 @@ local function createUI()
     local settingsPage = createTab("Settings", "Настройки")
     createTab("Credits", "Кредиты")
 
-    -- Установить активную вкладку
+    -- Инициализация активной вкладки
     for _, v in pairs(tabPages) do
         v.page.Visible = false
-        -- Безопасное скрытие лейбла
         local label = v.page:FindFirstChild("PageLabel")
         if label then label.Visible = false end
         TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = getColor3(themeConfig.TabButton)}):Play()
@@ -542,8 +535,315 @@ local function createUI()
         if label then showLabelWithFade(label) end
     end
 
-    -- Далее добавляем остальные элементы UI на вкладке Settings, как ранее
-    -- (для краткости не дублирую – добавь из предыдущих полных вариантов, обращая внимание на поиск PageLabel через FindFirstChild)
+    -- Добавление UI на вкладку Настроек
+    local configNameBox = Instance.new("TextBox")
+    configNameBox.Size = UDim2.new(0, 220, 0, 36)
+    configNameBox.Font = Enum.Font.Gotham
+    configNameBox.PlaceholderText = "Введите имя конфига"
+    configNameBox.Text = ""
+    configNameBox.TextSize = 17
+    configNameBox.TextColor3 = getColor3(themeConfig.Text)
+    configNameBox.BackgroundColor3 = Color3.fromRGB(32,18,28)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = configNameBox
+    configNameBox.Parent = settingsPage
+    configNameBox.LayoutOrder = 2
+    table.insert(UIRefs.Labels, configNameBox)
+
+    local dropdownContainer = Instance.new("Frame")
+    dropdownContainer.Name = "DropdownContainer"
+    dropdownContainer.Size = UDim2.new(1, 0, 1, 0)
+    dropdownContainer.BackgroundTransparency = 1
+    dropdownContainer.ZIndex = 99
+    dropdownContainer.Active = true
+    dropdownContainer.Parent = ScreenGui
+
+    local dropdownBtn = Instance.new("TextButton")
+    dropdownBtn.Size = UDim2.new(0, 36, 0, 36)
+    dropdownBtn.Position = UDim2.new(0, 230, 0, (configNameBox.AbsoluteSize.Y - 36)/2)
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
+    dropdownBtn.Text = "▼"
+    dropdownBtn.Font = Enum.Font.GothamBold
+    dropdownBtn.TextSize = 18
+    dropdownBtn.TextColor3 = getColor3(themeConfig.Text)
+    dropdownBtn.Parent = settingsPage
+    dropdownBtn.LayoutOrder = 3
+
+    local dropdownMenu = Instance.new("Frame")
+    dropdownMenu.Size = UDim2.new(0, 260, 0, 160)
+    dropdownMenu.BackgroundColor3 = getColor3(themeConfig.Background)
+    dropdownMenu.BorderSizePixel = 1
+    dropdownMenu.BorderColor3 = getColor3(themeConfig.Accent)
+    dropdownMenu.Visible = false
+    dropdownMenu.ZIndex = 100
+    dropdownMenu.Active = true
+    dropdownMenu.Parent = dropdownContainer
+
+    local uiLayoutConfig = Instance.new("UIListLayout")
+    uiLayoutConfig.Parent = dropdownMenu
+    uiLayoutConfig.SortOrder = Enum.SortOrder.LayoutOrder
+    uiLayoutConfig.Padding = UDim.new(0, 6)
+
+    local function updateDropdownConfigs()
+        for _, child in pairs(dropdownMenu:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        local success, list = pcall(function()
+            return listfiles(ROOT_FOLDER)
+        end)
+
+        if success and list then
+            local order = 1
+            for _, filePath in pairs(list) do
+                if filePath:sub(-5) == ".json" then
+                    local fileName = filePath:match("([^\\/]+)$")
+                    fileName = fileName:gsub("%.json$", "")
+                    local btn = Instance.new("TextButton")
+                    btn.Size = UDim2.new(1, -20, 0, 30)
+                    btn.BackgroundColor3 = getColor3(themeConfig.Button)
+                    btn.TextColor3 = getColor3(themeConfig.Text)
+                    btn.Font = Enum.Font.GothamBold
+                    btn.TextSize = 18
+                    btn.Text = fileName
+                    local btnCorner = Instance.new("UICorner")
+                    btnCorner.CornerRadius = UDim.new(0, 8)
+                    btnCorner.Parent = btn
+                    btn.Parent = dropdownMenu
+                    btn.LayoutOrder = order
+
+                    btn.MouseEnter:Connect(function()
+                        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = getColor3(themeConfig.Accent)}):Play()
+                    end)
+                    btn.MouseLeave:Connect(function()
+                        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = getColor3(themeConfig.Button)}):Play()
+                    end)
+
+                    btn.MouseButton1Click:Connect(function()
+                        configNameBox.Text = fileName
+                        dropdownMenu.Visible = false
+                    end)
+
+                    order = order + 1
+                end
+            end
+        else
+            print("Не удалось получить список файлов конфига из папки "..ROOT_FOLDER)
+        end
+    end
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        dropdownMenu.Visible = not dropdownMenu.Visible
+        if dropdownMenu.Visible then
+            updateDropdownConfigs()
+            local absPos = configNameBox.AbsolutePosition
+            local absSize = configNameBox.AbsoluteSize
+            dropdownMenu.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 6)
+        end
+    end)
+
+    createButton(settingsPage, "Сохранить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфигурации перед сохранением!")
+            return
+        end
+        local savePath = ROOT_FOLDER.."/"..name..".json"
+        local dataToSave = {
+            Theme = themeConfig,
+            Script = scriptConfig,
+        }
+        saveConfig(savePath, dataToSave)
+        print("Конфиг сохранен под именем: "..name)
+        updateDropdownConfigs()
+    end).LayoutOrder = 5
+
+    createButton(settingsPage, "Обновить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфигурации перед обновлением!")
+            return
+        end
+        local savePath = ROOT_FOLDER.."/"..name..".json"
+        local dataToSave = {
+            Theme = themeConfig,
+            Script = scriptConfig,
+        }
+        saveConfig(savePath, dataToSave)
+        print("Конфиг '"..name.."' обновлен.")
+        updateDropdownConfigs()
+    end).LayoutOrder = 6
+
+    createButton(settingsPage, "Удалить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфигурации для удаления!")
+            return
+        end
+
+        if settingsPage:FindFirstChild("ConfirmDeleteFrame") then
+            settingsPage.ConfirmDeleteFrame:Destroy()
+        end
+
+        local confirmFrame = Instance.new("Frame")
+        confirmFrame.Name = "ConfirmDeleteFrame"
+        confirmFrame.Size = UDim2.new(0, 320, 0, 120)
+        confirmFrame.Position = UDim2.new(0, 200, 0, 200)
+        confirmFrame.BackgroundColor3 = getColor3(themeConfig.Background)
+        confirmFrame.BorderSizePixel = 0
+        confirmFrame.Parent = settingsPage
+        confirmFrame.ZIndex = 110
+
+        local confirmText = Instance.new("TextLabel")
+        confirmText.Size = UDim2.new(1, -20, 0, 60)
+        confirmText.Position = UDim2.new(0, 10, 0, 10)
+        confirmText.BackgroundTransparency = 1
+        confirmText.TextColor3 = Color3.fromRGB(220, 180, 180)
+        confirmText.TextWrapped = true
+        confirmText.Font = Enum.Font.GothamBold
+        confirmText.TextSize = 18
+        confirmText.Text = "Вы уверены, что хотите удалить конфиг:\n'"..name.."'?"
+        confirmText.Parent = confirmFrame
+
+        local yesBtn = createButton(confirmFrame, "Да", function()
+            local delPath = ROOT_FOLDER.."/"..name..".json"
+            if isfile(delPath) then
+                delfile(delPath)
+                print("Конфиг '"..name.."' удалён.")
+                configNameBox.Text = ""
+            else
+                print("Файл конфига для удаления не найден.")
+            end
+            dropdownMenu.Visible = false
+            confirmFrame:Destroy()
+            updateDropdownConfigs()
+        end)
+        yesBtn.Size = UDim2.new(0, 140, 0, 36)
+        yesBtn.Position = UDim2.new(0, 10, 1, -50)
+        yesBtn.Parent = confirmFrame
+
+        local noBtn = createButton(confirmFrame, "Нет", function()
+            confirmFrame:Destroy()
+        end)
+        noBtn.Size = UDim2.new(0, 140, 0, 36)
+        noBtn.Position = UDim2.new(0, 170, 1, -50)
+        noBtn.Parent = confirmFrame
+    end).LayoutOrder = 7
+
+    createButton(settingsPage, "Нажми меня", function()
+        print("Кнопка нажата!")
+    end).LayoutOrder = 8
+
+    local toggleFrame, getToggleState = createToggle(settingsPage, "Тумблер", false, function(state)
+        print("Состояние тумблера:", state)
+    end)
+    toggleFrame.LayoutOrder = 9
+
+    createSlider(settingsPage, "Слайдер", 0, 100, 0.5, function(value)
+        print("Значение слайдера:", math.floor(value))
+    end).LayoutOrder = 10
+
+    local function createColorPicker(parent, labelText, colorTableKey, onChange)
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, 0, 0, 36)
+        container.BackgroundTransparency = 1
+        container.Parent = parent
+
+        local label = Instance.new("TextLabel")
+        label.Text = labelText
+        label.Size = UDim2.new(0.2, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = getColor3(themeConfig.Text)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 18
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = container
+        table.insert(UIRefs.Labels, label)
+
+        local boxSize = UDim2.new(0, 50, 0, 26)
+        local spacing = 8
+        local curX = 0.22
+
+        local function createChannelInput(channel)
+            local box = Instance.new("TextBox")
+            box.Size = boxSize
+            box.Position = UDim2.new(curX, 0, 0.15, 0)
+            box.Font = Enum.Font.Gotham
+            box.TextSize = 18
+            box.TextColor3 = Color3.new(1,1,1)
+            box.BackgroundColor3 = Color3.fromRGB(40, 30, 50)
+            box.PlaceholderText = channel..": "..themeConfig[colorTableKey][channel]
+            box.Parent = container
+
+            local uicorner = Instance.new("UICorner")
+            uicorner.CornerRadius = UDim.new(0, 6)
+            uicorner.Parent = box
+
+            curX = curX + (boxSize.X.Scale + spacing/320)
+
+            return box
+        end
+
+        local rBox = createChannelInput("R")
+        local gBox = createChannelInput("G")
+        local bBox = createChannelInput("B")
+
+        local function updateColor()
+            local r = tonumber(rBox.Text) or themeConfig[colorTableKey].R
+            local g = tonumber(gBox.Text) or themeConfig[colorTableKey].G
+            local b = tonumber(bBox.Text) or themeConfig[colorTableKey].B
+
+            r = math.clamp(r, 0, 255)
+            g = math.clamp(g, 0, 255)
+            b = math.clamp(b, 0, 255)
+
+            themeConfig[colorTableKey].R = r
+            themeConfig[colorTableKey].G = g
+            themeConfig[colorTableKey].B = b
+
+            if onChange then onChange() end
+            applyTheme()
+        end
+
+        for _, box in pairs({rBox,gBox,bBox}) do
+            box.FocusLost:Connect(function()
+                updateColor()
+            end)
+        end
+
+        return container
+    end
+
+    -- Цветовые настройки темы
+    local themeLabel = Instance.new("TextLabel")
+    themeLabel.Text = "Настройки темы"
+    themeLabel.Font = Enum.Font.GothamBold
+    themeLabel.TextSize = 22
+    themeLabel.TextColor3 = getColor3(themeConfig.Text)
+    themeLabel.BackgroundTransparency = 1
+    themeLabel.Size = UDim2.new(1, 0, 0, 30)
+    themeLabel.LayoutOrder = 11
+    themeLabel.Parent = settingsPage
+    table.insert(UIRefs.Labels, themeLabel)
+
+    local function addColorSetting(labelText, key)
+        local cp = createColorPicker(settingsPage, labelText, key, applyTheme)
+        cp.LayoutOrder = #settingsPage:GetChildren() + 1
+    end
+
+    addColorSetting("Фон", "Background")
+    addColorSetting("Акцент", "Accent")
+    addColorSetting("Цвет кнопок", "Button")
+    addColorSetting("Цвет вкладок", "TabButton")
+    addColorSetting("Тумблер Вкл.", "ToggleOn")
+    addColorSetting("Тумблер Выкл.", "ToggleOff")
+    addColorSetting("Цвет слайдера", "SliderFill")
+    addColorSetting("Цвет текста", "Text")
+
+    applyTheme()
 end
 
 createUI()
