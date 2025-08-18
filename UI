@@ -2,10 +2,259 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 
 local ScreenGui
 local MainFrame
 local tabPages = {}
+
+local ROOT_FOLDER = "MyExploitConfig"
+local THEME_FOLDER = ROOT_FOLDER.."/Themes"
+local SCRIPT_FOLDER = ROOT_FOLDER.."/ScriptConfigs"
+
+local themeConfigPath = THEME_FOLDER.."/themeConfig.json"
+local scriptConfigPath = SCRIPT_FOLDER.."/scriptConfig.json"
+
+local function ensureFolder(path)
+    if not isfolder(path) then
+        makefolder(path)
+    end
+end
+
+local function ensureFile(filepath, defaultData)
+    if not isfile(filepath) then
+        writefile(filepath, HttpService:JSONEncode(defaultData))
+    end
+end
+
+local defaultThemeConfig = {
+    Background = {R=18, G=18, B=28},
+    Accent = {R=153, G=51, B=255},
+    Text = {R=210, G=210, B=240},
+}
+
+local defaultScriptConfig = {
+    ToggleKey = "RightControl",
+    UIVisible = true,
+    CurrentTab = "Main"
+}
+
+ensureFolder(ROOT_FOLDER)
+ensureFolder(THEME_FOLDER)
+ensureFolder(SCRIPT_FOLDER)
+
+ensureFile(themeConfigPath, defaultThemeConfig)
+ensureFile(scriptConfigPath, defaultScriptConfig)
+
+local function loadConfig(path)
+    if isfile(path) then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile(path))
+        end)
+        if ok and data then
+            return data
+        end
+    end
+    return nil
+end
+
+local function saveConfig(path, data)
+    writefile(path, HttpService:JSONEncode(data))
+end
+
+local themeConfig = loadConfig(themeConfigPath) or defaultThemeConfig
+local scriptConfig = loadConfig(scriptConfigPath) or defaultScriptConfig
+
+local function createButton(parent, text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 160, 0, 40)
+    button.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
+    button.BorderSizePixel = 0
+    button.Text = text
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 18
+    button.TextColor3 = Color3.fromRGB(230, 230, 230)
+    button.Parent = parent
+
+    local buttonGradient = Instance.new("UIGradient")
+    buttonGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 50, 180)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 30, 120))
+    }
+    buttonGradient.Rotation = 90
+    buttonGradient.Parent = button
+
+    local originalColor = button.BackgroundColor3
+    local hoverColor = Color3.fromRGB(120, 70, 180)
+    local clickColor = Color3.fromRGB(60, 40, 100)
+
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
+        TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 170, 0, 45)}):Play()
+    end)
+
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = originalColor}):Play()
+        TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(230,230,230)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 160, 0, 40)}):Play()
+    end)
+
+    button.MouseButton1Down:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.11, Enum.EasingStyle.Quad), {BackgroundColor3 = clickColor}):Play()
+    end)
+
+    button.MouseButton1Up:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.13, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
+    end)
+
+    button.MouseButton1Click:Connect(callback)
+
+    return button
+end
+
+local function createToggle(parent, text, initialState, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 160, 0, 40)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Text = text
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 40, 0, 24)
+    toggle.Position = UDim2.new(0.75, 0, 0.2, 0)
+    toggle.BackgroundColor3 = initialState and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(100, 100, 100)
+    toggle.Text = ""
+    toggle.Parent = frame
+    toggle.Active = true
+
+    local disabledColor = Color3.fromRGB(100, 100, 100)
+    local hoverColorActive = Color3.fromRGB(140, 230, 140)
+    local hoverColorInactive = Color3.fromRGB(160, 130, 130)
+
+    local state = initialState
+
+    toggle.MouseEnter:Connect(function()
+        if state then
+            TweenService:Create(toggle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColorActive}):Play()
+        else
+            TweenService:Create(toggle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColorInactive}):Play()
+        end
+    end)
+
+    toggle.MouseLeave:Connect(function()
+        TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            BackgroundColor3 = state and Color3.fromRGB(100, 200, 100) or disabledColor
+        }):Play()
+    end)
+
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        local newColor = state and Color3.fromRGB(100, 200, 100) or disabledColor
+        TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = newColor}):Play()
+        if callback then
+            callback(state)
+        end
+    end)
+
+    return frame, function()
+        return state
+    end
+end
+
+local function createSlider(parent, text, minValue, maxValue, initialValue, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 320, 0, 40)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Text = text
+    label.Size = UDim2.new(0.3, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(0.65, 0, 0, 30)
+    sliderBar.Position = UDim2.new(0.35, 0, 0.5, -15)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = frame
+
+    local sliderBarGradient = Instance.new("UIGradient")
+    sliderBarGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 90, 120)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 70))
+    }
+    sliderBarGradient.Rotation = 90
+    sliderBarGradient.Parent = sliderBar
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 0, 12)
+    sliderFill.Position = UDim2.new(0, 0, 0.5, -6)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBar
+
+    local sliderFillGradient = Instance.new("UIGradient")
+    sliderFillGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 120, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 50, 230))
+    }
+    sliderFillGradient.Rotation = 90
+    sliderFillGradient.Parent = sliderFill
+
+    local dragging = false
+
+    local function tweenSliderFill(value)
+        local targetSize = UDim2.new(value, 0, 0, 12)
+        TweenService:Create(sliderFill, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            local relativeX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+            local value = (relativeX / sliderBar.AbsoluteSize.X)
+            tweenSliderFill(value)
+            if callback then
+                callback((minValue + value * (maxValue - minValue)))
+            end
+        end
+    end)
+
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relativeX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+            local value = (relativeX / sliderBar.AbsoluteSize.X)
+            tweenSliderFill(value)
+            if callback then
+                callback((minValue + value * (maxValue - minValue)))
+            end
+        end
+    end)
+
+    return frame
+end
 
 local function createUI()
     if ScreenGui then
@@ -155,7 +404,8 @@ local function createUI()
 
         local page = Instance.new("Frame")
         page.Size = UDim2.new(1, 0, 1, 0)
-        page.BackgroundTransparency = 1
+        page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
+        page.BackgroundTransparency = 0.7
         page.Visible = false
         page.Parent = ContentFrame
 
@@ -187,8 +437,8 @@ local function createUI()
                 TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
             end
             page.Visible = true
-            page.BackgroundTransparency = 1
-            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+            page.BackgroundTransparency = 0.7
+            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7})
             tweenIn:Play()
             TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
             showLabelWithFade(label)
@@ -209,197 +459,6 @@ local function createUI()
         warn("Ошибка: tabPages[1] не инициализированы")
     end
 
-    local function createButton(parent, text, callback)
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(0, 160, 0, 40)
-        button.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
-        button.BorderSizePixel = 0
-        button.Text = text
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 18
-        button.TextColor3 = Color3.fromRGB(230, 230, 230)
-        button.Parent = parent
-
-        local buttonGradient = Instance.new("UIGradient")
-        buttonGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 50, 180)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 30, 120))
-        }
-        buttonGradient.Rotation = 90
-        buttonGradient.Parent = button
-
-        local originalColor = button.BackgroundColor3
-        local hoverColor = Color3.fromRGB(120, 70, 180)
-        local clickColor = Color3.fromRGB(60, 40, 100)
-
-        button.MouseEnter:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
-            TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
-            TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 170, 0, 45)}):Play()
-        end)
-
-        button.MouseLeave:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = originalColor}):Play()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(230,230,230)}):Play()
-            TweenService:Create(button, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 160, 0, 40)}):Play()
-        end)
-
-        button.MouseButton1Down:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.11, Enum.EasingStyle.Quad), {BackgroundColor3 = clickColor}):Play()
-        end)
-
-        button.MouseButton1Up:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.13, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
-        end)
-
-        button.MouseButton1Click:Connect(callback)
-
-        return button
-    end
-
-    local function createToggle(parent, text, initialState, callback)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 160, 0, 40)
-        frame.BackgroundTransparency = 1
-        frame.Parent = parent
-
-        local label = Instance.new("TextLabel")
-        label.Text = text
-        label.Size = UDim2.new(0.7, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 18
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = frame
-
-        local toggle = Instance.new("TextButton")
-        toggle.Size = UDim2.new(0, 40, 0, 24)
-        toggle.Position = UDim2.new(0.75, 0, 0.2, 0)
-        toggle.BackgroundColor3 = initialState and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(100, 100, 100)
-        toggle.Text = ""
-        toggle.Parent = frame
-        toggle.Active = true
-
-        local disabledColor = Color3.fromRGB(100, 100, 100)
-        local hoverColorActive = Color3.fromRGB(140, 230, 140)
-        local hoverColorInactive = Color3.fromRGB(160, 130, 130)
-
-        local state = initialState
-
-        toggle.MouseEnter:Connect(function()
-            if state then
-                TweenService:Create(toggle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColorActive}):Play()
-            else
-                TweenService:Create(toggle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColorInactive}):Play()
-            end
-        end)
-
-        toggle.MouseLeave:Connect(function()
-            TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                BackgroundColor3 = state and Color3.fromRGB(100, 200, 100) or disabledColor
-            }):Play()
-        end)
-
-        toggle.MouseButton1Click:Connect(function()
-            state = not state
-            local newColor = state and Color3.fromRGB(100, 200, 100) or disabledColor
-            TweenService:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = newColor}):Play()
-            if callback then
-                callback(state)
-            end
-        end)
-
-        return frame, function()
-            return state
-        end
-    end
-
-    local function createSlider(parent, text, minValue, maxValue, initialValue, callback)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 320, 0, 40)
-        frame.BackgroundTransparency = 1
-        frame.Parent = parent
-
-        local label = Instance.new("TextLabel")
-        label.Text = text
-        label.Size = UDim2.new(0.3, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 18
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = frame
-
-        local sliderBar = Instance.new("Frame")
-        sliderBar.Size = UDim2.new(0.65, 0, 0, 30)
-        sliderBar.Position = UDim2.new(0.35, 0, 0.5, -15)
-        sliderBar.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
-        sliderBar.BorderSizePixel = 0
-        sliderBar.Parent = frame
-
-        local sliderBarGradient = Instance.new("UIGradient")
-        sliderBarGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 90, 120)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 70))
-        }
-        sliderBarGradient.Rotation = 90
-        sliderBarGradient.Parent = sliderBar
-
-        local sliderFill = Instance.new("Frame")
-        sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 0, 12)
-        sliderFill.Position = UDim2.new(0, 0, 0.5, -6)
-        sliderFill.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
-        sliderFill.BorderSizePixel = 0
-        sliderFill.Parent = sliderBar
-
-        local sliderFillGradient = Instance.new("UIGradient")
-        sliderFillGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 120, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 50, 230))
-        }
-        sliderFillGradient.Rotation = 90
-        sliderFillGradient.Parent = sliderFill
-
-        local dragging = false
-
-        local function tweenSliderFill(value)
-            local targetSize = UDim2.new(value, 0, 0, 12)
-            TweenService:Create(sliderFill, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
-        end
-
-        frame.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                local relativeX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
-                local value = (relativeX / sliderBar.AbsoluteSize.X)
-                tweenSliderFill(value)
-                if callback then
-                    callback((minValue + value * (maxValue - minValue)))
-                end
-            end
-        end)
-
-        frame.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-
-        frame.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local relativeX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
-                local value = (relativeX / sliderBar.AbsoluteSize.X)
-                tweenSliderFill(value)
-                if callback then
-                    callback((minValue + value * (maxValue - minValue)))
-                end
-            end
-        end)
-
-        return frame
-    end
-
     local settingsPage = tabPages[2].page
 
     local UIListLayoutSettings = Instance.new("UIListLayout")
@@ -408,6 +467,57 @@ local function createUI()
     UIListLayoutSettings.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayoutSettings.Parent = settingsPage
     UIListLayoutSettings.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+    -- Конфиг Input Box
+    local configNameBox = Instance.new("TextBox")
+    configNameBox.Size = UDim2.new(0, 220, 0, 36)
+    configNameBox.Font = Enum.Font.Gotham
+    configNameBox.PlaceholderText = "Введите имя конфига"
+    configNameBox.Text = ""
+    configNameBox.TextSize = 17
+    configNameBox.TextColor3 = Color3.fromRGB(230,230,240)
+    configNameBox.BackgroundColor3 = Color3.fromRGB(32,18,28)
+    configNameBox.Parent = settingsPage
+    local configBoxCorner = Instance.new("UICorner")
+    configBoxCorner.CornerRadius = UDim.new(0, 12)
+    configBoxCorner.Parent = configNameBox
+
+    -- Кнопка Сохранить конфиг
+    createButton(settingsPage, "Сохранить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфига перед сохранением!")
+            return
+        end
+        local dataToSave = {
+            Theme = themeConfig,
+            Script = scriptConfig,
+        }
+        local savePath = ROOT_FOLDER.."/"..name..".json"
+        saveConfig(savePath, dataToSave)
+        print("Конфиг сохранен под именем: "..name)
+    end)
+
+    -- Кнопка Загрузить конфиг
+    createButton(settingsPage, "Загрузить конфиг", function()
+        local name = configNameBox.Text
+        if name == "" then
+            print("Введите имя конфига перед загрузкой!")
+            return
+        end
+        local loadPath = ROOT_FOLDER.."/"..name..".json"
+        local data = loadConfig(loadPath)
+        if data then
+            themeConfig = data.Theme or defaultThemeConfig
+            scriptConfig = data.Script or defaultScriptConfig
+            print("Конфиг загружен: "..name)
+            -- Можно здесь добавить обновление GUI в соответствии с загруженными настройками
+        else
+            print("Конфиг с именем '"..name.."' не найден.")
+        end
+    end)
+
+    -- Остальные элементы на странице настроек
 
     createButton(settingsPage, "Нажми меня", function()
         print("Кнопка нажата!")
