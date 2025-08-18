@@ -27,10 +27,16 @@ local function ensureFile(filepath, defaultData)
     end
 end
 
+-- Default theme config with individual color groups
 local defaultThemeConfig = {
     Background = {R=18, G=18, B=28},
     Accent = {R=153, G=51, B=255},
-    Text = {R=210, G=210, B=240},
+    Button = {R=70, G=55, B=105},
+    TabButton = {R=80, G=50, B=140},
+    ToggleOn = {R=120, G=180, B=120},
+    ToggleOff = {R=170, G=170, B=170},
+    SliderFill = {R=155, G=65, B=240},
+    Text = {R=215, G=215, B=225},
 }
 
 local defaultScriptConfig = {
@@ -65,16 +71,62 @@ end
 local themeConfig = loadConfig(themeConfigPath) or defaultThemeConfig
 local scriptConfig = loadConfig(scriptConfigPath) or defaultScriptConfig
 
+-- Helper to convert RGB table to Color3
+local function RGBtoColor3(rgb)
+    return Color3.fromRGB(rgb.R, rgb.G, rgb.B)
+end
+-- Helper to convert Color3 to RGB table
+local function Color3ToRGB(color3)
+    return {R = math.clamp(math.floor(color3.R*255),0,255), G = math.clamp(math.floor(color3.G*255),0,255), B = math.clamp(math.floor(color3.B*255),0,255)}
+end
+
+-- Global UI references for theming
+local UIRefs = {
+    MainFrame = nil,
+    TabsBar = nil,
+    TabButtons = {},
+    Buttons = {},
+    Toggles = {},
+    SliderFills = {},
+    Labels = {},
+}
+
+local function applyTheme()
+    if not UIRefs.MainFrame then return end
+    UIRefs.MainFrame.BackgroundColor3 = RGBtoColor3(themeConfig.Background)
+
+    for _, btn in pairs(UIRefs.TabButtons) do
+        btn.BackgroundColor3 = RGBtoColor3(themeConfig.TabButton)
+    end
+
+    for _, btn in pairs(UIRefs.Buttons) do
+        btn.BackgroundColor3 = RGBtoColor3(themeConfig.Button)
+    end
+
+    for _, toggle in pairs(UIRefs.Toggles) do
+        local on = toggle:GetAttribute("State")
+        toggle.BackgroundColor3 = on and RGBtoColor3(themeConfig.ToggleOn) or RGBtoColor3(themeConfig.ToggleOff)
+    end
+
+    for _, fill in pairs(UIRefs.SliderFills) do
+        fill.BackgroundColor3 = RGBtoColor3(themeConfig.SliderFill)
+    end
+
+    for _, lbl in pairs(UIRefs.Labels) do
+        lbl.TextColor3 = RGBtoColor3(themeConfig.Text)
+    end
+end
+
 local function createButton(parent, text, callback)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(0, 160, 0, 40)
-    button.BackgroundColor3 = Color3.fromRGB(70, 55, 105)
+    button.BackgroundColor3 = RGBtoColor3(themeConfig.Button)
     button.BorderColor3 = Color3.fromRGB(110, 85, 170)
     button.BorderSizePixel = 1
     button.Text = text
     button.Font = Enum.Font.GothamBold
     button.TextSize = 18
-    button.TextColor3 = Color3.fromRGB(230, 230, 240)
+    button.TextColor3 = RGBtoColor3(themeConfig.Text)
     button.AutoButtonColor = false
     button.Parent = parent
 
@@ -83,19 +135,20 @@ local function createButton(parent, text, callback)
     uicorner.Parent = button
 
     button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(90,70,140)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = RGBtoColor3(themeConfig.Accent)}):Play()
     end)
     button.MouseLeave:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(70, 55, 105)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = RGBtoColor3(themeConfig.Button)}):Play()
     end)
     button.MouseButton1Down:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(50, 40, 80)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundColor3 = RGBtoColor3(themeConfig.TabButton)}):Play()
     end)
     button.MouseButton1Up:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(90,70,140)}):Play()
+        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundColor3 = RGBtoColor3(themeConfig.Accent)}):Play()
         if callback then callback() end
     end)
 
+    table.insert(UIRefs.Buttons, button)
     return button
 end
 
@@ -109,16 +162,17 @@ local function createToggle(parent, text, initialState, callback)
     label.Text = text
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(215, 215, 225)
+    label.TextColor3 = RGBtoColor3(themeConfig.Text)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 18
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
+    table.insert(UIRefs.Labels, label)
 
     local toggle = Instance.new("TextButton")
     toggle.Size = UDim2.new(0, 42, 0, 24)
     toggle.Position = UDim2.new(0.75, 0, 0.2, 0)
-    toggle.BackgroundColor3 = initialState and Color3.fromRGB(120, 180, 120) or Color3.fromRGB(170, 170, 170)
+    toggle.BackgroundColor3 = initialState and RGBtoColor3(themeConfig.ToggleOn) or RGBtoColor3(themeConfig.ToggleOff)
     toggle.BorderColor3 = Color3.fromRGB(100, 100, 100)
     toggle.BorderSizePixel = 1
     toggle.Text = ""
@@ -130,23 +184,26 @@ local function createToggle(parent, text, initialState, callback)
     uicorner.Parent = toggle
 
     local state = initialState
+    toggle:SetAttribute("State", state)
 
     toggle.MouseEnter:Connect(function()
         if state then
-            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(140, 200, 140)}):Play()
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.new(0.55, 0.85, 0.55)}):Play()
         else
-            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(190, 190, 190)}):Play()
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.new(0.7, 0.7, 0.7)}):Play()
         end
     end)
     toggle.MouseLeave:Connect(function()
-        TweenService:Create(toggle, TweenInfo.new(0.3), {BackgroundColor3 = state and Color3.fromRGB(120, 180, 120) or Color3.fromRGB(170, 170, 170)}):Play()
+        TweenService:Create(toggle, TweenInfo.new(0.3), {BackgroundColor3 = state and RGBtoColor3(themeConfig.ToggleOn) or RGBtoColor3(themeConfig.ToggleOff)}):Play()
     end)
     toggle.MouseButton1Click:Connect(function()
         state = not state
-        TweenService:Create(toggle, TweenInfo.new(0.15), {BackgroundColor3 = state and Color3.fromRGB(120, 180, 120) or Color3.fromRGB(170, 170, 170)}):Play()
+        toggle:SetAttribute("State", state)
+        TweenService:Create(toggle, TweenInfo.new(0.15), {BackgroundColor3 = state and RGBtoColor3(themeConfig.ToggleOn) or RGBtoColor3(themeConfig.ToggleOff)}):Play()
         if callback then callback(state) end
     end)
 
+    table.insert(UIRefs.Toggles, toggle)
     return frame, function () return state end
 end
 
@@ -160,11 +217,12 @@ local function createSlider(parent, text, minValue, maxValue, initialValue, call
     label.Text = text
     label.Size = UDim2.new(0.3, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(215, 215, 225)
+    label.TextColor3 = RGBtoColor3(themeConfig.Text)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 18
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
+    table.insert(UIRefs.Labels, label)
 
     local sliderBar = Instance.new("Frame")
     sliderBar.Size = UDim2.new(0.65, 0, 0, 28)
@@ -180,7 +238,7 @@ local function createSlider(parent, text, minValue, maxValue, initialValue, call
 
     local sliderFill = Instance.new("Frame")
     sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 1, 0)
-    sliderFill.BackgroundColor3 = Color3.fromRGB(155, 65, 240)
+    sliderFill.BackgroundColor3 = RGBtoColor3(themeConfig.SliderFill)
     sliderFill.BorderSizePixel = 0
     sliderFill.Parent = sliderBar
 
@@ -199,119 +257,146 @@ local function createSlider(parent, text, minValue, maxValue, initialValue, call
         end
     end
 
-    sliderBar.InputBegan:Connect(function(input)
+    frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            local localPos = sliderBar:AbsoluteToLocal(input.Position)
-            updateFill(minValue + (maxValue - minValue) * (localPos.X / sliderBar.AbsoluteSize.X))
+            local mouseX = UserInputService:GetMouseLocation().X
+            local sliderPosX = sliderBar.AbsolutePosition.X
+            local sliderWidth = sliderBar.AbsoluteSize.X
+            local pos = math.clamp(mouseX - sliderPosX, 0, sliderWidth)
+            updateFill(minValue + (maxValue - minValue) * (pos / sliderWidth))
         end
     end)
 
-    sliderBar.InputEnded:Connect(function(input)
+    frame.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
     end)
 
-    sliderBar.InputChanged:Connect(function(input)
+    frame.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local localPos = sliderBar:AbsoluteToLocal(input.Position)
-            updateFill(minValue + (maxValue - minValue) * (localPos.X / sliderBar.AbsoluteSize.X))
+            local mouseX = UserInputService:GetMouseLocation().X
+            local sliderPosX = sliderBar.AbsolutePosition.X
+            local sliderWidth = sliderBar.AbsoluteSize.X
+            local pos = math.clamp(mouseX - sliderPosX, 0, sliderWidth)
+            updateFill(minValue + (maxValue - minValue) * (pos / sliderWidth))
         end
     end)
 
+    table.insert(UIRefs.SliderFills, sliderFill)
     return frame
 end
 
-local function showLabelWithFade(label)
-    label.TextTransparency = 1
-    label.Visible = true
-    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local tween = TweenService:Create(label, tweenInfo, {TextTransparency = 0})
-    tween:Play()
-end
-
-local function createTab(name, pageLabelText)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 140, 0, 44)
-    btn.BackgroundColor3 = Color3.fromRGB(80, 50, 140)
-    btn.BorderSizePixel = 0
-    btn.Text = name
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 18
-    btn.TextColor3 = Color3.fromRGB(230, 230, 230)
-    btn.Parent = TabsBar
-
-    local buttonGradient = Instance.new("UIGradient")
-    buttonGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 70, 200)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 40, 150))
-    }
-    buttonGradient.Rotation = 90
-    buttonGradient.Parent = btn
-
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
-    page.BackgroundTransparency = 0.7
-    page.Visible = false
-    page.ScrollBarThickness = 6
-    page.ScrollBarImageColor3 = Color3.fromRGB(153, 51, 255)
-    page.Parent = ContentFrame
+local function createColorPicker(parent, labelText, colorTableKey, onChange)
+    -- Color picker fields for R, G, B (0-255)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 36)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 28)
-    label.Position = UDim2.new(0, 0, 0, 0)
+    label.Text = labelText
+    label.Size = UDim2.new(0.2, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = pageLabelText
+    label.TextColor3 = RGBtoColor3(themeConfig.Text)
     label.Font = Enum.Font.GothamBold
-    label.TextSize = 28
-    label.TextColor3 = Color3.fromRGB(180, 90, 255)
-    label.Parent = page
-    label.LayoutOrder = 1
+    label.TextSize = 18
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    table.insert(UIRefs.Labels, label)
 
-    local textStroke = Instance.new("UIStroke")
-    textStroke.Thickness = 1.5
-    textStroke.Color = Color3.new(0, 0, 0)
-    textStroke.Transparency = 0.7
-    textStroke.Parent = label
+    local boxSize = UDim2.new(0, 50, 0, 26)
+    local spacing = 8
+    local curX = 0.22
 
-    local UIListLayoutPage = Instance.new("UIListLayout")
-    UIListLayoutPage.FillDirection = Enum.FillDirection.Vertical
-    UIListLayoutPage.Padding = UDim.new(0, 16)
-    UIListLayoutPage.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayoutPage.Parent = page
-    UIListLayoutPage.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    local function createChannelInput(channel)
+        local box = Instance.new("TextBox")
+        box.Size = boxSize
+        box.Position = UDim2.new(curX, 0, 0.15, 0)
+        box.Font = Enum.Font.Gotham
+        box.TextSize = 18
+        box.TextColor3 = Color3.new(1,1,1)
+        box.BackgroundColor3 = Color3.fromRGB(40, 30, 50)
+        box.PlaceholderText = channel..": "..themeConfig[colorTableKey][channel]
+        box.Parent = container
 
-    UIListLayoutPage:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        page.CanvasSize = UDim2.new(0, 0, 0, UIListLayoutPage.AbsoluteContentSize.Y + 16)
-    end)
+        local uicorner = Instance.new("UICorner")
+        uicorner.CornerRadius = UDim.new(0, 6)
+        uicorner.Parent = box
 
-    btn.MouseButton1Click:Connect(function()
-        for _, v in pairs(tabPages) do
-            if v.page.Visible then
-                local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-                tweenOut.Completed:Connect(function()
-                    v.page.Visible = false
-                    v.label.Visible = false
-                end)
-                tweenOut:Play()
-            else
-                v.label.Visible = false
-            end
-            TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
-        end
-        page.Visible = true
-        page.BackgroundTransparency = 0.7
-        local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7})
-        tweenIn:Play()
-        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(153, 51, 255)}):Play()
-        page.label.Visible = true
-        showLabelWithFade(page.label)
-    end)
+        curX = curX + (boxSize.X.Scale + spacing/320)
 
-    tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
-    return page
+        return box
+    end
+
+    local rBox = createChannelInput("R")
+    local gBox = createChannelInput("G")
+    local bBox = createChannelInput("B")
+
+    local function updateColor()
+        local r = tonumber(rBox.Text) or themeConfig[colorTableKey].R
+        local g = tonumber(gBox.Text) or themeConfig[colorTableKey].G
+        local b = tonumber(bBox.Text) or themeConfig[colorTableKey].B
+
+        r = math.clamp(r, 0, 255)
+        g = math.clamp(g, 0, 255)
+        b = math.clamp(b, 0, 255)
+
+        themeConfig[colorTableKey].R = r
+        themeConfig[colorTableKey].G = g
+        themeConfig[colorTableKey].B = b
+
+        if onChange then onChange() end
+        applyTheme()
+    end
+
+    for _, box in pairs({rBox,gBox,bBox}) do
+        box.FocusLost:Connect(function(enterPressed)
+            updateColor()
+        end)
+    end
+
+    return container
+end
+
+local function createSettingsThemeSection(parent)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 300)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = container
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 12)
+
+    local title = Instance.new("TextLabel")
+    title.Text = "Настройки темы"
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 24
+    title.TextColor3 = RGBtoColor3(themeConfig.Text)
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Parent = container
+    table.insert(UIRefs.Labels, title)
+
+    local colorParams = {
+        {key = "Background", label = "Фон главного окна"},
+        {key = "Accent", label = "Акцент (активные элементы)"},
+        {key = "Button", label = "Кнопки"},
+        {key = "TabButton", label = "Вкладки (неактивные)"},
+        {key = "ToggleOn", label = "Тумблер (активный)"},
+        {key = "ToggleOff", label = "Тумблер (неактивный)"},
+        {key = "SliderFill", label = "Слайдер (заполнение)"},
+        {key = "Text", label = "Текст"},
+    }
+
+    for i, param in ipairs(colorParams) do
+        local picker = createColorPicker(container, param.label, param.key, applyTheme)
+        picker.LayoutOrder = i + 1
+    end
+
+    return container
 end
 
 local function createUI()
@@ -330,9 +415,10 @@ local function createUI()
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.Size = UDim2.new(0, 700, 0, 480)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+    MainFrame.BackgroundColor3 = RGBtoColor3(themeConfig.Background)
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
+    UIRefs.MainFrame = MainFrame
     MainFrame.Visible = true
 
     local Header = Instance.new("Frame")
@@ -354,11 +440,12 @@ local function createUI()
     TitleLabel.Text = "Pro UI Library"
     TitleLabel.Font = Enum.Font.GothamBold
     TitleLabel.TextSize = 24
-    TitleLabel.TextColor3 = Color3.fromRGB(230, 230, 255)
+    TitleLabel.TextColor3 = RGBtoColor3(themeConfig.Text)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.Position = UDim2.new(0, 12, 0, 8)
     TitleLabel.Size = UDim2.new(0, 200, 0, 32)
     TitleLabel.Parent = Header
+    table.insert(UIRefs.Labels, TitleLabel)
 
     local dragging = false
     local dragStart = nil
@@ -392,9 +479,10 @@ local function createUI()
     TabsBar = Instance.new("Frame")
     TabsBar.Size = UDim2.new(1, -40, 0, 48)
     TabsBar.Position = UDim2.new(0, 20, 0, 58)
-    TabsBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    TabsBar.BackgroundColor3 = RGBtoColor3(themeConfig.TabButton)
     TabsBar.BorderSizePixel = 0
     TabsBar.Parent = MainFrame
+    UIRefs.TabsBar = TabsBar
 
     local tabsGradient = Instance.new("UIGradient")
     tabsGradient.Color = ColorSequence.new{
@@ -404,11 +492,11 @@ local function createUI()
     tabsGradient.Rotation = 90
     tabsGradient.Parent = TabsBar
 
-    local UIListLayout = Instance.new("UIListLayout")
-    UIListLayout.FillDirection = Enum.FillDirection.Horizontal
-    UIListLayout.Padding = UDim.new(0, 20)
-    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Parent = TabsBar
+    local UIListLayoutTabs = Instance.new("UIListLayout")
+    UIListLayoutTabs.FillDirection = Enum.FillDirection.Horizontal
+    UIListLayoutTabs.Padding = UDim.new(0, 20)
+    UIListLayoutTabs.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayoutTabs.Parent = TabsBar
 
     ContentFrame = Instance.new("Frame")
     ContentFrame.Size = UDim2.new(1, -40, 1, -120)
@@ -418,39 +506,126 @@ local function createUI()
 
     tabPages = {}
 
+    local function createTab(name, pageLabelText)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 140, 0, 44)
+        btn.BackgroundColor3 = RGBtoColor3(themeConfig.TabButton)
+        btn.BorderSizePixel = 0
+        btn.Text = name
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 18
+        btn.TextColor3 = RGBtoColor3(themeConfig.Text)
+        btn.Parent = TabsBar
+
+        local buttonGradient = Instance.new("UIGradient")
+        buttonGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 70, 200)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 40, 150))
+        }
+        buttonGradient.Rotation = 90
+        buttonGradient.Parent = btn
+
+        table.insert(UIRefs.TabButtons, btn)
+
+        local page = Instance.new("ScrollingFrame")
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundColor3 = RGBtoColor3(themeConfig.Background)
+        page.BackgroundTransparency = 0.7
+        page.Visible = false
+        page.ScrollBarThickness = 6
+        page.ScrollBarImageColor3 = RGBtoColor3(themeConfig.Accent)
+        page.Parent = ContentFrame
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0, 28)
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = pageLabelText
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 28
+        label.TextColor3 = RGBtoColor3(themeConfig.Text)
+        label.Parent = page
+        label.LayoutOrder = 1
+        table.insert(UIRefs.Labels, label)
+
+        local textStroke = Instance.new("UIStroke")
+        textStroke.Thickness = 1.5
+        textStroke.Color = Color3.new(0, 0, 0)
+        textStroke.Transparency = 0.7
+        textStroke.Parent = label
+
+        local UIListLayoutPage = Instance.new("UIListLayout")
+        UIListLayoutPage.FillDirection = Enum.FillDirection.Vertical
+        UIListLayoutPage.Padding = UDim.new(0, 16)
+        UIListLayoutPage.SortOrder = Enum.SortOrder.LayoutOrder
+        UIListLayoutPage.Parent = page
+        UIListLayoutPage.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+        UIListLayoutPage:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            page.CanvasSize = UDim2.new(0, 0, 0, UIListLayoutPage.AbsoluteContentSize.Y + 16)
+        end)
+
+        btn.MouseButton1Click:Connect(function()
+            for _, v in pairs(tabPages) do
+                if v.page.Visible then
+                    local tweenOut = TweenService:Create(v.page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+                    tweenOut.Completed:Connect(function()
+                        v.page.Visible = false
+                        v.label.Visible = false
+                    end)
+                    tweenOut:Play()
+                else
+                    v.label.Visible = false
+                end
+                TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = RGBtoColor3(themeConfig.TabButton)}):Play()
+            end
+            page.Visible = true
+            page.BackgroundTransparency = 0.7
+            local tweenIn = TweenService:Create(page, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7})
+            tweenIn:Play()
+            TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = RGBtoColor3(themeConfig.Accent)}):Play()
+            page.label.Visible = true
+            showLabelWithFade(page.label)
+        end)
+
+        tabPages[#tabPages + 1] = {button = btn, page = page, label = label}
+        return page
+    end
+
     local mainPage = createTab("Main", "Главная страница")
-    local settingsPage = createTab("Settings", "Настройки (будет дополнено)")
+    local settingsPage = createTab("Settings", "Настройки")
     createTab("Credits", "Кредиты")
 
+    -- Initialize visible tab
     for _, v in pairs(tabPages) do
         v.page.Visible = false
         v.label.Visible = false
-        TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 140)}):Play()
+        TweenService:Create(v.button, TweenInfo.new(0.3), {BackgroundColor3 = RGBtoColor3(themeConfig.TabButton)}):Play()
     end
     if tabPages[1] then
         tabPages[1].page.Visible = true
         tabPages[1].label.Visible = true
-        tabPages[1].button.BackgroundColor3 = Color3.fromRGB(153, 51, 255)
+        tabPages[1].button.BackgroundColor3 = RGBtoColor3(themeConfig.Accent)
         showLabelWithFade(tabPages[1].label)
-    else
-        warn("Ошибка: tabPages[1] не инициализированы")
     end
 
+    -- Create UI elements on Settings tab
     local configNameBox = Instance.new("TextBox")
     configNameBox.Size = UDim2.new(0, 220, 0, 36)
     configNameBox.Font = Enum.Font.Gotham
     configNameBox.PlaceholderText = "Введите имя конфига"
     configNameBox.Text = ""
     configNameBox.TextSize = 17
-    configNameBox.TextColor3 = Color3.fromRGB(230,230,240)
+    configNameBox.TextColor3 = RGBtoColor3(themeConfig.Text)
     configNameBox.BackgroundColor3 = Color3.fromRGB(32,18,28)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = configNameBox
     configNameBox.Parent = settingsPage
-    local configBoxCorner = Instance.new("UICorner")
-    configBoxCorner.CornerRadius = UDim.new(0, 12)
-    configBoxCorner.Parent = configNameBox
     configNameBox.LayoutOrder = 2
+    table.insert(UIRefs.Labels, configNameBox)
 
-    -- Dropdown container для правильного отображения и клика
+    -- Dropdown container for config selection
     local dropdownContainer = Instance.new("Frame")
     dropdownContainer.Name = "DropdownContainer"
     dropdownContainer.Size = UDim2.new(1, 0, 1, 0)
@@ -459,35 +634,36 @@ local function createUI()
     dropdownContainer.Active = true
     dropdownContainer.Parent = ScreenGui
 
-    -- Кнопка-стрелка для открытия меню
+    -- Dropdown button to open list
     local dropdownBtn = Instance.new("TextButton")
     dropdownBtn.Size = UDim2.new(0, 36, 0, 36)
+    dropdownBtn.Position = UDim2.new(0, 230, 0, (configNameBox.AbsoluteSize.Y - 36)/2)
     dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
     dropdownBtn.Text = "▼"
     dropdownBtn.Font = Enum.Font.GothamBold
     dropdownBtn.TextSize = 18
-    dropdownBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+    dropdownBtn.TextColor3 = RGBtoColor3(themeConfig.Text)
     dropdownBtn.Parent = settingsPage
     dropdownBtn.LayoutOrder = 3
 
-    -- Само меню конфигов
+    -- Configs dropdown menu
     local dropdownMenu = Instance.new("Frame")
-    dropdownMenu.Size = UDim2.new(0, 260, 0, 150)
-    dropdownMenu.BackgroundColor3 = Color3.fromRGB(24, 16, 30)
+    dropdownMenu.Size = UDim2.new(0, 260, 0, 160)
+    dropdownMenu.BackgroundColor3 = RGBtoColor3(themeConfig.Background)
     dropdownMenu.BorderSizePixel = 1
-    dropdownMenu.BorderColor3 = Color3.fromRGB(153, 51, 255)
+    dropdownMenu.BorderColor3 = RGBtoColor3(themeConfig.Accent)
     dropdownMenu.Visible = false
     dropdownMenu.ZIndex = 100
     dropdownMenu.Active = true
     dropdownMenu.Parent = dropdownContainer
 
-    local uiLayout = Instance.new("UIListLayout")
-    uiLayout.Parent = dropdownMenu
-    uiLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    uiLayout.Padding = UDim.new(0, 4)
+    local uiLayoutConfig = Instance.new("UIListLayout")
+    uiLayoutConfig.Parent = dropdownMenu
+    uiLayoutConfig.SortOrder = Enum.SortOrder.LayoutOrder
+    uiLayoutConfig.Padding = UDim.new(0, 6)
 
     local function updateDropdownConfigs()
-        for i, child in pairs(dropdownMenu:GetChildren()) do
+        for _, child in pairs(dropdownMenu:GetChildren()) do
             if child:IsA("TextButton") then
                 child:Destroy()
             end
@@ -504,24 +680,35 @@ local function createUI()
                     local fileName = filePath:match("([^\\/]+)$")
                     fileName = fileName:gsub("%.json$", "")
                     local btn = Instance.new("TextButton")
-                    btn.Size = UDim2.new(1, -12, 0, 30)
-                    btn.BackgroundColor3 = Color3.fromRGB(70, 40, 110)
-                    btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+                    btn.Size = UDim2.new(1, -20, 0, 30)
+                    btn.BackgroundColor3 = RGBtoColor3(themeConfig.Button)
+                    btn.TextColor3 = RGBtoColor3(themeConfig.Text)
                     btn.Font = Enum.Font.GothamBold
                     btn.TextSize = 18
                     btn.Text = fileName
+                    local btnCorner = Instance.new("UICorner")
+                    btnCorner.CornerRadius = UDim.new(0, 8)
+                    btnCorner.Parent = btn
                     btn.Parent = dropdownMenu
                     btn.LayoutOrder = order
-                    order = order + 1
+
+                    btn.MouseEnter:Connect(function()
+                        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = RGBtoColor3(themeConfig.Accent)}):Play()
+                    end)
+                    btn.MouseLeave:Connect(function()
+                        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = RGBtoColor3(themeConfig.Button)}):Play()
+                    end)
 
                     btn.MouseButton1Click:Connect(function()
                         configNameBox.Text = fileName
                         dropdownMenu.Visible = false
                     end)
+
+                    order = order + 1
                 end
             end
         else
-            print("Не удалось получить список файлов конфигов из папки "..ROOT_FOLDER)
+            print("Не удалось получить список файлов конфига из папки "..ROOT_FOLDER)
         end
     end
 
@@ -531,23 +718,24 @@ local function createUI()
             updateDropdownConfigs()
             local absPos = configNameBox.AbsolutePosition
             local absSize = configNameBox.AbsoluteSize
-            dropdownMenu.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 5)
+            dropdownMenu.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 6)
         end
     end)
 
     createButton(settingsPage, "Сохранить конфиг", function()
         local name = configNameBox.Text
         if name == "" then
-            print("Введите имя конфига перед сохранением!")
+            print("Введите имя конфигурации перед сохранением!")
             return
         end
+        local savePath = ROOT_FOLDER.."/"..name..".json"
         local dataToSave = {
             Theme = themeConfig,
             Script = scriptConfig,
         }
-        local savePath = ROOT_FOLDER.."/"..name..".json"
         saveConfig(savePath, dataToSave)
         print("Конфиг сохранен под именем: "..name)
+        updateDropdownConfigs()
     end).LayoutOrder = 5
 
     createButton(settingsPage, "Обновить конфиг", function()
@@ -563,6 +751,7 @@ local function createUI()
         }
         saveConfig(savePath, dataToSave)
         print("Конфиг '"..name.."' обновлен.")
+        updateDropdownConfigs()
     end).LayoutOrder = 6
 
     createButton(settingsPage, "Удалить конфиг", function()
@@ -580,7 +769,7 @@ local function createUI()
         confirmFrame.Name = "ConfirmDeleteFrame"
         confirmFrame.Size = UDim2.new(0, 320, 0, 120)
         confirmFrame.Position = UDim2.new(0, 200, 0, 200)
-        confirmFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
+        confirmFrame.BackgroundColor3 = RGBtoColor3(themeConfig.Background)
         confirmFrame.BorderSizePixel = 0
         confirmFrame.Parent = settingsPage
         confirmFrame.ZIndex = 110
@@ -607,6 +796,7 @@ local function createUI()
             end
             dropdownMenu.Visible = false
             confirmFrame:Destroy()
+            updateDropdownConfigs()
         end)
         yesBtn.Size = UDim2.new(0, 140, 0, 36)
         yesBtn.Position = UDim2.new(0, 10, 1, -50)
@@ -633,9 +823,18 @@ local function createUI()
         print("Значение слайдера:", math.floor(value))
     end).LayoutOrder = 10
 
-    createButton(settingsPage, "Выключить GUI", function()
-        ScreenGui:Destroy()
-    end).LayoutOrder = 11
+    -- Тема настройки цветов
+    createColorPicker(settingsPage, "Фон", "Background", applyTheme).LayoutOrder = 11
+    createColorPicker(settingsPage, "Акцент", "Accent", applyTheme).LayoutOrder = 12
+    createColorPicker(settingsPage, "Цвет кнопок", "Button", applyTheme).LayoutOrder = 13
+    createColorPicker(settingsPage, "Цвет вкладок", "TabButton", applyTheme).LayoutOrder = 14
+    createColorPicker(settingsPage, "Тумблер включен", "ToggleOn", applyTheme).LayoutOrder = 15
+    createColorPicker(settingsPage, "Тумблер выключен", "ToggleOff", applyTheme).LayoutOrder = 16
+    createColorPicker(settingsPage, "Цвет заполнения слайдера", "SliderFill", applyTheme).LayoutOrder = 17
+    createColorPicker(settingsPage, "Цвет текста", "Text", applyTheme).LayoutOrder = 18
+    
+    -- Применим тему сразу после создания UI
+    applyTheme()
 end
 
 createUI()
