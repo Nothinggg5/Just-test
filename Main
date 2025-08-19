@@ -1,15 +1,13 @@
 local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService") -- для сериализации JSON
+local HttpService = game:GetService("HttpService")
 
-local SaveFileName = "rjp_position.json" -- имя файла для сохранения позиции
+local SaveFileName = "rjp_position.json"
 
--- Функция сохранения позиции в локальный файл
 local function savePositionToFile(position)
     local data = HttpService:JSONEncode({x = position.X, y = position.Y, z = position.Z})
-    writefile(SaveFileName, data) -- функция writefile должна быть доступна в вашем эксплойте
+    writefile(SaveFileName, data)
 end
 
--- Функция загрузки позиции из файла
 local function loadPositionFromFile()
     if not isfile(SaveFileName) then return nil end
     local data = readfile(SaveFileName)
@@ -26,7 +24,7 @@ local Plugin = {
     Commands = {
         ["rjp"] = {
             ListName = "rjp",
-            Description = "Сохранить позицию и телепортироваться на неё после перезахода",
+            Description = "Сохраняет позицию и телепортирует после перезагрузки",
             Function = function(args, speaker)
                 if not speaker then return end
                 if not speaker.Character then return end
@@ -35,11 +33,13 @@ local Plugin = {
 
                 local pos = hrp.Position
                 savePositionToFile(pos)
-                speaker:LoadCharacter()
 
-                -- Телепорт сразу после появления HumanoidRootPart
-                coroutine.wrap(function()
-                    local char = speaker.Character or speaker.CharacterAdded:Wait()
+                local player = speaker
+
+                -- Подписываемся на следующее добавление персонажа, чтобы телепортировать
+                local conn
+                conn = player.CharacterAdded:Connect(function(char)
+                    conn:Disconnect() -- отписываемся после первого запуска
                     local hrpNew = char:WaitForChild("HumanoidRootPart", 10)
                     if hrpNew then
                         local savedPos = loadPositionFromFile()
@@ -47,7 +47,9 @@ local Plugin = {
                             char:PivotTo(CFrame.new(savedPos))
                         end
                     end
-                end)()
+                end)
+
+                player:LoadCharacter() -- Перезаходим, чтобы вызвался CharacterAdded
             end,
         },
     },
