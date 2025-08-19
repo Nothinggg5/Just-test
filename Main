@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 
 local SaveFileName = "rjp_position.json"
@@ -24,7 +25,7 @@ local Plugin = {
     Commands = {
         ["rjp"] = {
             ListName = "rjp",
-            Description = "Сохраняет позицию и телепортирует после перезагрузки",
+            Description = "Сохраняет позицию и пытается перезайти, иначе респавн с позицией",
             Function = function(args, speaker)
                 if not speaker then return end
                 if not speaker.Character then return end
@@ -34,24 +35,27 @@ local Plugin = {
                 local pos = hrp.Position
                 savePositionToFile(pos)
 
-                local player = speaker
-
-                local connection
-                connection = player.CharacterAdded:Connect(function(char)
-                    -- Отключаем событие после первого срабатывания
-                    connection:Disconnect()
-
-                    local hrpNew = char:WaitForChild("HumanoidRootPart", 10)
-                    if hrpNew then
-                        local savedPos = loadPositionFromFile()
-                        if savedPos then
-                            -- Телепортируем мгновенно, изменяя Position HumanoidRootPart
-                            hrpNew.CFrame = CFrame.new(savedPos)
-                        end
-                    end
+                local success, err = pcall(function()
+                    TeleportService:Teleport(game.PlaceId, speaker)
                 end)
 
-                player:LoadCharacter() -- Перезапускаем персонажа
+                if not success then
+                    warn("Teleport запрещён или не работает, выполняем LoadCharacter вместо него: ".. tostring(err))
+
+                    local player = speaker
+                    local connection
+                    connection = player.CharacterAdded:Connect(function(char)
+                        connection:Disconnect()
+                        local hrpNew = char:WaitForChild("HumanoidRootPart", 10)
+                        if hrpNew then
+                            local savedPos = loadPositionFromFile()
+                            if savedPos then
+                                hrpNew.CFrame = CFrame.new(savedPos)
+                            end
+                        end
+                    end)
+                    player:LoadCharacter()
+                end
             end,
         },
     },
