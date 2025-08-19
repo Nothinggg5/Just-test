@@ -36,20 +36,22 @@ local Plugin = {
 
                 local player = speaker
 
-                -- Подписываемся на следующее добавление персонажа, чтобы телепортировать
-                local conn
-                conn = player.CharacterAdded:Connect(function(char)
-                    conn:Disconnect() -- отписываемся после первого запуска
+                local connection
+                connection = player.CharacterAdded:Connect(function(char)
+                    -- Отключаем событие после первого срабатывания
+                    connection:Disconnect()
+
                     local hrpNew = char:WaitForChild("HumanoidRootPart", 10)
                     if hrpNew then
                         local savedPos = loadPositionFromFile()
                         if savedPos then
-                            char:PivotTo(CFrame.new(savedPos))
+                            -- Телепортируем мгновенно, изменяя Position HumanoidRootPart
+                            hrpNew.CFrame = CFrame.new(savedPos)
                         end
                     end
                 end)
 
-                player:LoadCharacter() -- Перезаходим, чтобы вызвался CharacterAdded
+                player:LoadCharacter() -- Перезапускаем персонажа
             end,
         },
     },
